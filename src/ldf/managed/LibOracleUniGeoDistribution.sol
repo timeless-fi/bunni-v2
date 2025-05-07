@@ -473,6 +473,14 @@ library LibOracleUniGeoDistribution {
         // compute results
         oracleTick += oracleTickOffset; // apply offset to oracle tick
         (tickLower, tickUpper) = oracleIsTickLower ? (oracleTick, nonOracleTick) : (nonOracleTick, oracleTick);
+
+        // bound tickLower and tickUpper by minUsableTick and maxUsableTick
+        // in case oracleTick is some crazy value
+        (int24 minUsableTick, int24 maxUsableTick) =
+            (TickMath.minUsableTick(tickSpacing), TickMath.maxUsableTick(tickSpacing));
+        tickLower = int24(FixedPointMathLib.max(minUsableTick, tickLower));
+        tickUpper = int24(FixedPointMathLib.min(maxUsableTick, tickUpper));
+
         if (tickLower >= tickUpper) {
             // ensure tickLower < tickUpper
             // use the non oracle tick as the bound

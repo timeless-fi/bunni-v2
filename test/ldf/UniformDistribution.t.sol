@@ -204,13 +204,39 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         assertEq(tickUpper, maxUsableTick, "tickUpper incorrect");
         assertTrue(decodedShiftMode == shiftMode, "shiftMode incorrect");
 
-        // bounded when minTick < minUsableTick and maxTick > maxUsableTick
+        // invalid params when minTick < minUsableTick and maxTick > maxUsableTick
         (offset, length) = (minUsableTick - tickSpacing, (maxUsableTick - minUsableTick) / tickSpacing + 2);
         ldfParams = bytes32(abi.encodePacked(shiftMode, offset, length));
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 2");
-        (tickLower, tickUpper, decodedShiftMode) = LibUniformDistribution.decodeParams(0, tickSpacing, ldfParams);
-        assertEq(tickLower, minUsableTick, "tickLower incorrect");
-        assertEq(tickUpper, maxUsableTick, "tickUpper incorrect");
-        assertTrue(decodedShiftMode == shiftMode, "shiftMode incorrect");
+        assertFalse(ldf.isValidParams(key, 1, ldfParams), "invalid params 2");
+    }
+
+    function test_poc_shiftmode() external virtual {
+        int24 tickSpacing = MIN_TICK_SPACING;
+        (int24 minUsableTick, int24 maxUsableTick) =
+            (TickMath.minUsableTick(tickSpacing), TickMath.maxUsableTick(tickSpacing));
+        int24 tickLower = minUsableTick;
+        int24 tickUpper = maxUsableTick;
+        int24 length = (tickUpper - minUsableTick) / tickSpacing;
+        int24 currentTick = minUsableTick + tickSpacing * 2;
+        int24 offset = roundTickSingle(tickLower - currentTick, tickSpacing);
+        assertTrue(offset % tickSpacing == 0, "offset not divisible by tickSpacing");
+
+        console2.log("tickSpacing", tickSpacing);
+        console2.log("tickLower", tickLower);
+        console2.log("tickUpper", tickUpper);
+        console2.log("length", length);
+        console2.log("currentTick", currentTick);
+        console2.log("offset", offset);
+
+        PoolKey memory key;
+        key.tickSpacing = tickSpacing;
+        bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.RIGHT, offset, length));
+        assertTrue(ldf.isValidParams(key, 15 minutes, ldfParams));
+
+        bytes32 INITIALIZED_STATE = bytes32(abi.encodePacked(true, currentTick));
+        int24 roundedTick = roundTickSingle(currentTick, tickSpacing);
+        // vm.expectPartialRevert(0x8b86327a);
+        (, uint256 cumulativeAmount0DensityX96, uint256 cumulativeAmount1DensityX96,,) =
+            ldf.query(key, roundedTick, 0, currentTick, ldfParams, INITIALIZED_STATE);
     }
 }
