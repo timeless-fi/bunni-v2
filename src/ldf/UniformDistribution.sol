@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+
+import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
 import "./ShiftMode.sol";
 import {Guarded} from "../base/Guarded.sol";
@@ -43,8 +46,11 @@ contract UniformDistribution is ILiquidityDensityFunction, Guarded {
         (bool initialized, int24 lastTickLower) = _decodeState(ldfState);
         if (initialized) {
             int24 tickLength = tickUpper - tickLower;
-            tickLower = enforceShiftMode(tickLower, lastTickLower, shiftMode);
-            tickUpper = tickLower + tickLength;
+            (int24 minUsableTick, int24 maxUsableTick) =
+                (TickMath.minUsableTick(key.tickSpacing), TickMath.maxUsableTick(key.tickSpacing));
+            tickLower =
+                int24(FixedPointMathLib.max(minUsableTick, enforceShiftMode(tickLower, lastTickLower, shiftMode)));
+            tickUpper = int24(FixedPointMathLib.min(maxUsableTick, tickLower + tickLength));
             shouldSurge = tickLower != lastTickLower;
         }
 
