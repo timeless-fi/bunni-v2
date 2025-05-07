@@ -579,6 +579,9 @@ library BunniHubLogic {
         /// Verification
         /// -----------------------------------------------------------------------
 
+        // ensure hook is whitelisted
+        if (!s.hookWhitelist[IBunniHook(address(params.hooks))]) revert BunniHub__HookNotWhitelisted();
+
         // each Uniswap v4 pool corresponds to a single BunniToken
         // since Univ4 pool key is deterministic based on poolKey, we use dynamic fee so that the lower 20 bits of `poolKey.fee` is used
         // as nonce to differentiate the BunniTokens

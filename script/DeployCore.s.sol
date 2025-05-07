@@ -41,6 +41,9 @@ contract DeployCoreScript is CREATE3Script {
         zoneSalt = getCreate3SaltFromEnv("BunniZone");
         hookSalt = getCreate3SaltFromEnv("BunniHook");
 
+        address[] memory hookWhitelist = new address[](1);
+        hookWhitelist[0] = getCreate3ContractFromEnvSalt("BunniHook");
+
         vm.startBroadcast(deployerPrivateKey);
 
         hub = BunniHub(
@@ -49,7 +52,7 @@ contract DeployCoreScript is CREATE3Script {
                     hubSalt,
                     bytes.concat(
                         type(BunniHub).creationCode,
-                        abi.encode(poolManager, weth, permit2, new BunniToken(), owner, hookFeeRecipient)
+                        abi.encode(poolManager, weth, permit2, new BunniToken(), owner, hookFeeRecipient, hookWhitelist)
                     )
                 )
             )

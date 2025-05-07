@@ -224,7 +224,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     }
 
     /// @dev Settles tokens sent to PoolManager and mints the corresponding claim tokens.
-    /// Then calls hub.hookHandleSwap to update pool balances with rebalance swap output.
+    /// Then calls hub.hookGive to update pool balances with rebalance swap output.
     /// Used while executing rebalance orders.
     function _rebalancePosthookCallback(bytes memory callbackData) internal {
         // decode data
@@ -241,11 +241,8 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         uint256 paid = poolManager.settle{value: currency.isAddressZero() ? amount : 0}();
         poolManager.mint(address(this), currency.toId(), paid);
 
-        // unlock BunniHub
-        hub.unlockForRebalance(key);
-
         // push claim tokens to BunniHub
-        hub.hookHandleSwap({key: key, zeroForOne: zeroForOne, inputAmount: paid, outputAmount: 0});
+        hub.hookGive({key: key, isCurrency0: zeroForOne, amount: paid});
     }
 
     /// @dev Claims protocol fees earned and sends it to the recipient.

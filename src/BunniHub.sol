@@ -97,7 +97,8 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
         IPermit2 permit2_,
         IBunniToken bunniTokenImplementation_,
         address initialOwner,
-        address initialReferralRewardRecipient
+        address initialReferralRewardRecipient,
+        IBunniHook[] memory initialHookWhitelist
     ) {
         require(
             address(permit2_) != address(0) && address(poolManager_) != address(0) && address(weth_) != address(0)
@@ -112,6 +113,12 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
 
         s.referralRewardRecipient = initialReferralRewardRecipient;
         emit SetReferralRewardRecipient(initialReferralRewardRecipient);
+
+        // set initial hook whitelist
+        for (uint256 i; i < initialHookWhitelist.length; i++) {
+            s.hookWhitelist[initialHookWhitelist[i]] = true;
+            emit SetHookWhitelist(initialHookWhitelist[i], true);
+        }
     }
 
     /// -----------------------------------------------------------
@@ -279,10 +286,20 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IBunniHub
-    function unlockForRebalance(PoolKey calldata key) external notPaused(7) {
-        if (address(_getBunniTokenOfPool(key.toId())) == address(0)) revert BunniHub__BunniTokenNotInitialized();
+    function hookGive(PoolKey calldata key, bool isCurrency0, uint256 amount) external override notPaused(7) {
         if (msg.sender != address(key.hooks)) revert BunniHub__Unauthorized();
-        _nonReentrantAfter();
+        if (amount == 0) return; // no-op if amount is zero
+
+        PoolId poolId = key.toId();
+
+        // pull claim tokens from hook
+        if (isCurrency0) {
+            s.poolState[poolId].rawBalance0 += amount; // effect
+            poolManager.transferFrom(address(key.hooks), address(this), key.currency0.toId(), amount); // interaction
+        } else {
+            s.poolState[poolId].rawBalance1 += amount; // effect
+            poolManager.transferFrom(address(key.hooks), address(this), key.currency1.toId(), amount); // interaction
+        }
     }
 
     receive() external payable {}
@@ -316,6 +333,12 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     function burnPauseFuse() external onlyOwner {
         s.unpauseFuse = true; // all functions are permanently unpaused
         emit BurnPauseFuse();
+    }
+
+    /// @inheritdoc IBunniHub
+    function setHookWhitelist(IBunniHook hook, bool whitelisted) external onlyOwner {
+        s.hookWhitelist[hook] = whitelisted;
+        emit SetHookWhitelist(hook, whitelisted);
     }
 
     /// -----------------------------------------------------------------------
@@ -382,6 +405,11 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     /// @inheritdoc IBunniHub
     function getPauseStatus() external view returns (uint8 pauseFlags, bool unpauseFuse) {
         return (s.pauseFlags, s.unpauseFuse);
+    }
+
+    /// @inheritdoc IBunniHub
+    function hookIsWhitelisted(IBunniHook hook) external view returns (bool) {
+        return s.hookWhitelist[hook];
     }
 
     /// -----------------------------------------------------------------------

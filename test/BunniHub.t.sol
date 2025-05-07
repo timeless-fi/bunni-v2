@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
 
+import {IAmAmm} from "biddog/interfaces/IAmAmm.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
+import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
+
 import "./BaseTest.sol";
 
-contract BunniHubTest is BaseTest {
+contract BunniHubTest is BaseTest, IUnlockCallback {
     using TickMath for *;
     using FullMathX96 for *;
     using SafeCastLib for *;
@@ -837,12 +841,6 @@ contract BunniHubTest is BaseTest {
             vm.expectRevert(BunniHub__Paused.selector);
             hub.lockForRebalance(key);
         }
-
-        if (pauseFlags & (1 << 7) != 0) {
-            // unlockForRebalance() is paused
-            vm.expectRevert(BunniHub__Paused.selector);
-            hub.unlockForRebalance(key);
-        }
     }
 
     function test_unpauseFuse() external {
@@ -946,9 +944,6 @@ contract BunniHubTest is BaseTest {
         // lockForRebalance() is not paused
         hub.lockForRebalance(key);
 
-        // unlockForRebalance() is not paused
-        hub.unlockForRebalance(key);
-
         vm.stopPrank();
     }
 
@@ -982,4 +977,356 @@ contract BunniHubTest is BaseTest {
         vm.expectRevert(BunniHub__Unauthorized.selector);
         hub.setPauseFlags(pauseFlags);
     }
+
+    function test_hookWhitelist_authChecks(IBunniHook hook) external {
+        // owner can set hook whitelist
+        hub.setHookWhitelist(hook, true);
+        assertTrue(hub.hookIsWhitelisted(hook), "hook not whitelisted by owner");
+        hub.setHookWhitelist(hook, false); // reset
+        assertFalse(hub.hookIsWhitelisted(hook), "hook not blacklisted by owner");
+
+        // others cannot set hook whitelist
+        address others = makeAddr("others");
+        vm.prank(others);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        hub.setHookWhitelist(hook, true);
+    }
+
+    function test_hookWhitelist_cannotDeployPoolWithBlacklistedHook() external {
+        // deploy pool
+        (IBunniToken bunniToken, PoolKey memory key) = _deployPoolAndInitLiquidity();
+
+        // blacklist hook
+        hub.setHookWhitelist(bunniHook, false);
+
+        // cannot deploy pool
+        vm.expectRevert(BunniHub__HookNotWhitelisted.selector);
+        hub.deployBunniToken(
+            IBunniHub.DeployBunniTokenParams({
+                currency0: key.currency0,
+                currency1: key.currency1,
+                tickSpacing: TICK_SPACING,
+                twapSecondsAgo: 7 days,
+                liquidityDensityFunction: ldf,
+                hooklet: IHooklet(address(0)),
+                ldfType: LDFType.DYNAMIC_AND_STATEFUL,
+                ldfParams: bytes32(0),
+                hooks: bunniHook,
+                hookParams: bytes(""),
+                vault0: ERC4626(address(0)),
+                vault1: ERC4626(address(0)),
+                minRawTokenRatio0: 0.08e6,
+                targetRawTokenRatio0: 0.1e6,
+                maxRawTokenRatio0: 0.12e6,
+                minRawTokenRatio1: 0.08e6,
+                targetRawTokenRatio1: 0.1e6,
+                maxRawTokenRatio1: 0.12e6,
+                sqrtPriceX96: uint160(Q96),
+                name: "BunniToken",
+                symbol: "BUNNI-LP",
+                owner: address(this),
+                metadataURI: "metadataURI",
+                salt: bytes32(0)
+            })
+        );
+    }
+
+    function test_revert_BunniHubDrainingRawBalances() public {
+        // 1. Create the malicious pool linked to the malicious hook
+        bytes32 salt;
+        unchecked {
+            bytes memory creationCode = abi.encodePacked(type(CustomHook).creationCode);
+            uint256 offset;
+            while (true) {
+                salt = bytes32(offset);
+                address deployed = computeAddress(address(this), salt, creationCode);
+                if (uint160(bytes20(deployed)) & Hooks.ALL_HOOK_MASK == HOOK_FLAGS && deployed.code.length == 0) {
+                    break;
+                }
+                offset++;
+            }
+        }
+        address customHook = address(new CustomHook{salt: salt}());
+
+        // 2. Create the malicious vault
+        MaliciousERC4626 maliciousVault = new MaliciousERC4626(token1, customHook);
+        token1.approve(address(maliciousVault), type(uint256).max);
+        _mint(Currency.wrap(address(token1)), address(maliciousVault), 1 ether);
+
+        // 3. Register the malicious pool
+        // we whitelist the pool to show that this attack is impossible even with a whitelisted pool
+        hub.setHookWhitelist(BunniHook(payable(customHook)), true);
+        (, PoolKey memory maliciousKey) = hub.deployBunniToken(
+            IBunniHub.DeployBunniTokenParams({
+                currency0: Currency.wrap(address(token0)),
+                currency1: Currency.wrap(address(token1)),
+                tickSpacing: TICK_SPACING,
+                twapSecondsAgo: TWAP_SECONDS_AGO,
+                liquidityDensityFunction: new MockLDF(address(hub), address(customHook), address(quoter)),
+                hooklet: IHooklet(address(0)),
+                ldfType: LDFType.STATIC,
+                ldfParams: bytes32(abi.encodePacked(ShiftMode.BOTH, int24(-3) * TICK_SPACING, int16(6), ALPHA)),
+                hooks: BunniHook(payable(customHook)),
+                hookParams: "",
+                vault0: ERC4626(address(vault0)),
+                vault1: ERC4626(address(maliciousVault)),
+                minRawTokenRatio0: 1e6, // set to 100% in order to have all funds in raw balance
+                targetRawTokenRatio0: 1e6, // set to 100% in order to have all funds in raw balance
+                maxRawTokenRatio0: 1e6, // set to 100% in order to have all funds in raw balance
+                minRawTokenRatio1: 0, // set to 0% in order to trigger a deposit upon transfering 1 token
+                targetRawTokenRatio1: 0, // set to 0% in order to trigger a deposit upon transfering 1 token
+                maxRawTokenRatio1: 0, // set to 0% in order to trigger a deposit upon transfering 1 token
+                sqrtPriceX96: TickMath.getSqrtPriceAtTick(4),
+                name: bytes32("MaliciousBunniToken"),
+                symbol: bytes32("BAD-BUNNI-LP"),
+                owner: address(this),
+                metadataURI: "metadataURI",
+                salt: bytes32(keccak256("malicious"))
+            })
+        );
+
+        // 4. Add some token0 ERC6909 into the hub to simulate raw balances from other legit pools
+        uint256 bunniHubToken0RawBalance = 10 ether;
+        poolManager.unlock(abi.encode(address(hub), bunniHubToken0RawBalance, address(token0)));
+
+        // 5. Make a deposit to the malicious pool to have accounted some reserves of vault0 and initiate attack
+        uint256 initialToken0Deposit = 1 ether;
+        deal(address(token0), address(this), initialToken0Deposit);
+        deal(address(token1), address(this), initialToken0Deposit);
+        token0.approve(customHook, initialToken0Deposit);
+        token1.approve(customHook, initialToken0Deposit);
+        CustomHook(payable(customHook)).depositInitialReserves(
+            address(token0), initialToken0Deposit, address(hub), poolManager, maliciousKey, true
+        );
+        CustomHook(payable(customHook)).mintERC6909(address(token1), initialToken0Deposit);
+        console.log(
+            "Initial hub token0 raw balances",
+            poolManager.balanceOf(address(hub), Currency.wrap(address(token0)).toId())
+        );
+
+        maliciousVault.setupAttack();
+        vm.expectRevert(ReentrancyGuard.ReentrancyGuard__ReentrantCall.selector);
+        CustomHook(payable(customHook)).initiateAttack(IBunniHub(address(hub)), maliciousKey, initialToken0Deposit, 10);
+        console.log(
+            "Final hook token0 raw balance", poolManager.balanceOf(customHook, Currency.wrap(address(token0)).toId())
+        );
+        console.log(
+            "Final hub token0 raw balance", poolManager.balanceOf(address(hub), Currency.wrap(address(token0)).toId())
+        );
+    }
+
+    function test_revert_BunniHubDrainingVaultReserves() public {
+        // 1. Create the malicious pool linked to the malicious hook
+        bytes32 salt;
+        unchecked {
+            bytes memory creationCode = abi.encodePacked(type(CustomHook).creationCode);
+            uint256 offset;
+            while (true) {
+                salt = bytes32(offset);
+                address deployed = computeAddress(address(this), salt, creationCode);
+                if (uint160(bytes20(deployed)) & Hooks.ALL_HOOK_MASK == HOOK_FLAGS && deployed.code.length == 0) {
+                    break;
+                }
+                offset++;
+            }
+        }
+        address customHook = address(new CustomHook{salt: salt}());
+
+        // 2. Create the malicious vault
+        MaliciousERC4626 maliciousVault = new MaliciousERC4626(token1, customHook);
+        token1.approve(address(maliciousVault), type(uint256).max);
+        _mint(Currency.wrap(address(token1)), address(maliciousVault), 1 ether);
+
+        // 3. Register the malicious pool
+        // we whitelist the pool to show that this attack is impossible even with a whitelisted pool
+        hub.setHookWhitelist(BunniHook(payable(customHook)), true);
+        (, PoolKey memory maliciousKey) = hub.deployBunniToken(
+            IBunniHub.DeployBunniTokenParams({
+                currency0: Currency.wrap(address(token0)),
+                currency1: Currency.wrap(address(token1)),
+                tickSpacing: TICK_SPACING,
+                twapSecondsAgo: TWAP_SECONDS_AGO,
+                liquidityDensityFunction: new MockLDF(address(hub), address(customHook), address(quoter)),
+                hooklet: IHooklet(address(0)),
+                ldfType: LDFType.STATIC,
+                ldfParams: bytes32(abi.encodePacked(ShiftMode.BOTH, int24(-3) * TICK_SPACING, int16(6), ALPHA)),
+                hooks: BunniHook(payable(customHook)),
+                hookParams: "",
+                vault0: ERC4626(address(vault0)), // targeted vault to be drained
+                vault1: ERC4626(address(maliciousVault)),
+                minRawTokenRatio0: 0, // set to 0% in order to have all deposited funds accounted into the vault
+                targetRawTokenRatio0: 0, // set to 0% in order to have all deposited funds accounted into the vault
+                maxRawTokenRatio0: 0, // set to 0% in order to have all deposited funds accounted into the vault
+                minRawTokenRatio1: 0, // set to 0% in order to trigger a deposit upon transfering 1 token
+                targetRawTokenRatio1: 0, // set to 0% in order to trigger a deposit upon transfering 1 token
+                maxRawTokenRatio1: 0, // set to 0% in order to trigger a deposit upon transfering 1 token
+                sqrtPriceX96: TickMath.getSqrtPriceAtTick(4),
+                name: bytes32("MaliciousBunniToken"),
+                symbol: bytes32("BAD-BUNNI-LP"),
+                owner: address(this),
+                metadataURI: "metadataURI",
+                salt: bytes32(keccak256("malicious"))
+            })
+        );
+
+        // 4. Add some token0 reserves into the hub to simulate balances from other legit pools
+        uint256 bunniHubToken0Reserves = 10 ether;
+        deal(address(token0), address(hub), bunniHubToken0Reserves);
+        vm.startPrank(address(hub));
+        token0.approve(address(vault0), bunniHubToken0Reserves);
+        vault0.deposit(bunniHubToken0Reserves, address(hub));
+        vm.stopPrank();
+
+        // 5. Make a deposit to the malicious pool to have accounted some reserves of vault0 and initiate attack
+        uint256 initialToken0Deposit = 1 ether;
+        deal(address(token0), address(this), initialToken0Deposit);
+        deal(address(token1), address(this), initialToken0Deposit);
+        token0.approve(customHook, initialToken0Deposit);
+        token1.approve(customHook, initialToken0Deposit);
+        CustomHook(payable(customHook)).depositInitialReserves(
+            address(token0), initialToken0Deposit, address(hub), poolManager, maliciousKey, true
+        );
+        CustomHook(payable(customHook)).mintERC6909(address(token1), initialToken0Deposit);
+        console.log("Initial hub token0 reserve", vault0.balanceOf(address(hub)));
+
+        maliciousVault.setupAttack();
+        vm.expectRevert(ReentrancyGuard.ReentrancyGuard__ReentrantCall.selector);
+        CustomHook(payable(customHook)).initiateAttack(IBunniHub(address(hub)), maliciousKey, initialToken0Deposit, 10);
+        console.log(
+            "Final hook token0 balance", poolManager.balanceOf(customHook, Currency.wrap(address(token0)).toId())
+        );
+        console.log("Final hub token0 balance", vault0.balanceOf(address(hub)));
+    }
+
+    function unlockCallback(bytes calldata data) external override returns (bytes memory) {
+        (address hub_, uint256 amount, Currency token) = abi.decode(data, (address, uint256, Currency));
+
+        // call sync on PoolManager
+        poolManager.sync(token);
+
+        // mint tokens to PoolManager
+        deal(Currency.unwrap(token), address(poolManager), amount);
+
+        // settle balance
+        poolManager.settle();
+
+        // mint claim tokens to hub
+        poolManager.mint(hub_, token.toId(), amount);
+
+        return bytes("");
+    }
+}
+
+contract CustomHook {
+    uint256 public reentrancyIterations;
+    uint256 public iterationsCounter;
+    IBunniHub public hub;
+    PoolKey public key;
+    uint256 public amountOfReservesToWithdraw;
+    IPoolManager public poolManager;
+
+    function isValidParams(bytes calldata hookParams) external pure returns (bool) {
+        return true;
+    }
+
+    function slot0s(PoolId id)
+        external
+        view
+        returns (uint160 sqrtPriceX96, int24 tick, uint32 lastSwapTimestamp, uint32 lastSurgeTimestamp)
+    {
+        int24 minTick = TickMath.MIN_TICK;
+        (sqrtPriceX96, tick, lastSwapTimestamp, lastSurgeTimestamp) = (TickMath.getSqrtPriceAtTick(tick), tick, 0, 0);
+    }
+
+    function getTopBidWrite(PoolId id) external view returns (IAmAmm.Bid memory topBid) {
+        topBid = IAmAmm.Bid({manager: address(0), blockIdx: 0, payload: 0, rent: 0, deposit: 0});
+    }
+
+    function getAmAmmEnabled(PoolId id) external view returns (bool) {
+        return false;
+    }
+
+    function canWithdraw(PoolId id) external view returns (bool) {
+        return true;
+    }
+
+    function afterInitialize(address caller, PoolKey calldata key, uint160 sqrtPriceX96, int24 tick)
+        external
+        returns (bytes4)
+    {
+        return BunniHook.afterInitialize.selector;
+    }
+
+    function beforeSwap(address sender, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata)
+        external
+        returns (bytes4, int256, uint24)
+    {
+        return (BunniHook.beforeSwap.selector, 0, 0);
+    }
+
+    function depositInitialReserves(
+        address token,
+        uint256 amount,
+        address _hub,
+        IPoolManager _poolManager,
+        PoolKey memory _key,
+        bool zeroForOne
+    ) external {
+        key = _key;
+        hub = IBunniHub(_hub);
+        poolManager = _poolManager;
+        poolManager.setOperator(_hub, true);
+        poolManager.unlock(abi.encode(uint8(0), token, amount, msg.sender, zeroForOne));
+        poolManager.unlock(abi.encode(uint8(1), address(0), amount, msg.sender, zeroForOne));
+    }
+
+    function mintERC6909(address token, uint256 amount) external {
+        poolManager.unlock(abi.encode(uint8(0), token, amount, msg.sender, true));
+    }
+
+    function unlockCallback(bytes calldata data) external returns (bytes memory result) {
+        (uint8 mode, address token, uint256 amount, address spender, bool zeroForOne) =
+            abi.decode(data, (uint8, address, uint256, address, bool));
+        if (mode == 0) {
+            poolManager.sync(Currency.wrap(token));
+            IERC20(token).transferFrom(spender, address(poolManager), amount);
+            uint256 deltaAmount = poolManager.settle();
+            poolManager.mint(address(this), Currency.wrap(token).toId(), deltaAmount);
+        } else if (mode == 1) {
+            hub.hookHandleSwap(key, zeroForOne, amount, 0);
+        } else if (mode == 2) {
+            hub.hookHandleSwap(key, false, 1, amountOfReservesToWithdraw);
+        }
+    }
+
+    function initiateAttack(
+        IBunniHub _hub,
+        PoolKey memory _key,
+        uint256 _amountOfReservesToWithdraw,
+        uint256 iterations
+    ) public {
+        reentrancyIterations = iterations;
+        iterationsCounter = 0;
+        hub = _hub;
+        key = _key;
+        amountOfReservesToWithdraw = _amountOfReservesToWithdraw;
+        poolManager.unlock(abi.encode(uint8(2), address(0), amountOfReservesToWithdraw, msg.sender, true));
+    }
+
+    function continueAttackFromMaliciousVault() public {
+        if (iterationsCounter != reentrancyIterations) {
+            iterationsCounter++;
+            disableReentrancyGuard();
+            hub.hookHandleSwap(
+                key, false, 1, /* amountToDeposit to trigger the updateIfNeeded */ amountOfReservesToWithdraw
+            );
+        }
+    }
+
+    function disableReentrancyGuard() public {
+        // Note: commented out because unlockForRebalance() no longer exists in BunniHub
+        // hub.unlockForRebalance(key);
+    }
+
+    fallback() external payable {}
 }

@@ -41,7 +41,6 @@ import {ERC20Mock} from "./mocks/ERC20Mock.sol";
 import {BunniToken} from "../src/BunniToken.sol";
 import {Uniswapper} from "./mocks/Uniswapper.sol";
 import {HookletMock} from "./mocks/HookletMock.sol";
-import {ERC4626Mock} from "./mocks/ERC4626Mock.sol";
 import {IERC20} from "../src/interfaces/IERC20.sol";
 import {PoolState} from "../src/types/PoolState.sol";
 import {HookletLib} from "../src/lib/HookletLib.sol";
@@ -58,6 +57,7 @@ import {IBunniToken} from "../src/interfaces/IBunniToken.sol";
 import {OrderHashMemory} from "../src/lib/OrderHashMemory.sol";
 import {ReentrancyGuard} from "../src/base/ReentrancyGuard.sol";
 import {ERC4626WithFeeMock} from "./mocks/ERC4626WithFeeMock.sol";
+import {ERC4626Mock, MaliciousERC4626} from "./mocks/ERC4626Mock.sol";
 import {GeometricDistribution} from "../src/ldf/GeometricDistribution.sol";
 import {DoubleGeometricDistribution} from "../src/ldf/DoubleGeometricDistribution.sol";
 import {ILiquidityDensityFunction} from "../src/interfaces/ILiquidityDensityFunction.sol";
@@ -187,7 +187,8 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
         swapper = new Uniswapper(poolManager);
 
         // initialize bunni hub
-        hub = new BunniHub(poolManager, weth, PERMIT2, new BunniToken(), address(this), address(this));
+        IBunniHook[] memory hookWhitelist = new IBunniHook[](0);
+        hub = new BunniHub(poolManager, weth, PERMIT2, new BunniToken(), address(this), address(this), hookWhitelist);
 
         // deploy zone
         zone = new BunniZone(address(this));
@@ -232,6 +233,9 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
             K
         );
         vm.label(address(bunniHook), "BunniHook");
+
+        // whitelist hook
+        hub.setHookWhitelist(bunniHook, true);
 
         // deploy quoter
         quoter = new BunniQuoter(hub);
