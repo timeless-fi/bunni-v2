@@ -506,6 +506,9 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
             uint256 poolManagerReserve = currency.balanceOf(address(poolManager));
             absAmount = FixedPointMathLib.min(FixedPointMathLib.min(absAmount, maxDepositAmount), poolManagerReserve);
 
+            // If the amount to deposit is zero, ignore the deposit execution
+            if (absAmount == 0) return (0, 0);
+
             // burn claim tokens from this
             poolManager.burn(address(this), currency.toId(), absAmount);
 

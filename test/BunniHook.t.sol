@@ -1676,6 +1676,49 @@ contract BunniHookTest is BaseTest {
         assertFalse(isToken0After, "idle balance should still be in token1");
     }
 
+    function test_PoCVaultDoS() public {
+        Currency currency0 = Currency.wrap(address(token0));
+        Currency currency1 = Currency.wrap(address(token1));
+        ERC4626 vault0_ = vault0;
+        ERC4626 vault1_ = vault1;
+
+        (, PoolKey memory key) = _deployPoolAndInitLiquidity(currency0, currency1, vault0_, vault1_);
+
+        uint256 inputAmount = PRECISION / 10;
+
+        _mint(key.currency0, address(this), inputAmount);
+        uint256 value = key.currency0.isAddressZero() ? inputAmount : 0;
+
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -int256(inputAmount),
+            sqrtPriceLimitX96: TickMath.getSqrtPriceAtTick(3)
+        });
+
+        // Set up conditions
+        // 1. Ensure that raw balance is greater than the max, hence it would need to trigger the vault
+        // deposit
+        uint256 amountOfAssetsToBurn = vault0.balanceOf(address(hub)) / 3;
+        vm.prank(address(hub));
+        vault0.transfer(address(0xdead), amountOfAssetsToBurn);
+        // 2. Ensure maxDeposit is 0
+        vault0.setMaxDepositFor(address(hub));
+
+        // After the fix has been applied, the following revert will not happen and the swap
+        // will be processed successfully
+        /* 
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                WrappedError.selector,
+                address(bunniHook),
+                BunniHook.beforeSwap.selector,
+                abi.encodePacked(ERC4626Mock.ZeroAssetsDeposit.selector),
+                abi.encodePacked(bytes4(keccak256("HookCallFailed()")))
+            )
+        ); */
+        _swap(key, params, value, "swap");
+    }
+
     // Implementation of IFulfiller interface
     function sourceConsideration(
         bytes28, /* selectorExtension */
