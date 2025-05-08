@@ -32,6 +32,10 @@ using SSTORE2 for address;
 /// @member minRawTokenRatio1 The minimum (rawBalance / balance) ratio for currency1
 /// @member targetRawTokenRatio1 The target (rawBalance / balance) ratio for currency1
 /// @member maxRawTokenRatio1 The maximum (rawBalance / balance) ratio for currency1
+/// @member currency0Decimals The decimals of currency0
+/// @member currency1Decimals The decimals of currency1
+/// @member vault0Decimals The decimals of vault0
+/// @member vault1Decimals The decimals of vault1
 /// @member rawBalance0 The raw token balance of currency0. Raw just means it's not stored in a ERC4626 vault.
 /// @member rawBalance1 The raw token balance of currency1. Raw just means it's not stored in a ERC4626 vault.
 /// @member reserve0 The vault share tokens owned in vault0
@@ -53,6 +57,10 @@ struct PoolState {
     uint24 minRawTokenRatio1;
     uint24 targetRawTokenRatio1;
     uint24 maxRawTokenRatio1;
+    uint8 currency0Decimals;
+    uint8 currency1Decimals;
+    uint8 vault0Decimals;
+    uint8 vault1Decimals;
     uint256 rawBalance0;
     uint256 rawBalance1;
     uint256 reserve0;
@@ -201,11 +209,47 @@ function getPoolParams(address ptr) view returns (PoolState memory state) {
     }
 
     {
+        uint8 currency0Decimals;
+        /// @solidity memory-safe-assembly
+        assembly {
+            currency0Decimals := shr(248, mload(add(immutableParams, 186)))
+        }
+        state.currency0Decimals = currency0Decimals;
+    }
+
+    {
+        uint8 currency1Decimals;
+        /// @solidity memory-safe-assembly
+        assembly {
+            currency1Decimals := shr(248, mload(add(immutableParams, 187)))
+        }
+        state.currency1Decimals = currency1Decimals;
+    }
+
+    {
+        uint8 vault0Decimals;
+        /// @solidity memory-safe-assembly
+        assembly {
+            vault0Decimals := shr(248, mload(add(immutableParams, 188)))
+        }
+        state.vault0Decimals = vault0Decimals;
+    }
+
+    {
+        uint8 vault1Decimals;
+        /// @solidity memory-safe-assembly
+        assembly {
+            vault1Decimals := shr(248, mload(add(immutableParams, 189)))
+        }
+        state.vault1Decimals = vault1Decimals;
+    }
+
+    {
         bytes memory hookParams;
         /// @solidity memory-safe-assembly
         assembly {
-            let hookParamsLen := shr(240, mload(add(immutableParams, 186))) // uint16
-            hookParams := add(immutableParams, 156) // 156 = 186 (hookParamsLen location) + 2 (hookParamsLen is uint16) - 32 (expand hookParamsLen to 32 bytes)
+            let hookParamsLen := shr(240, mload(add(immutableParams, 190))) // uint16
+            hookParams := add(immutableParams, 160) // 160 = 190 (hookParamsLen location) + 2 (hookParamsLen is uint16) - 32 (expand hookParamsLen to 32 bytes)
             mstore(hookParams, hookParamsLen) // overwrite length field of `bytes memory hookParams`
         }
         state.hookParams = hookParams;

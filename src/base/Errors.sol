@@ -22,6 +22,7 @@ error BunniHub__GracePeriodExpired();
 error BunniHub__NoExpiredWithdrawal();
 error BunniHub__MsgValueInsufficient();
 error BunniHub__DepositAmountTooSmall();
+error BunniHub__VaultDecimalsTooSmall();
 error BunniHub__QueuedWithdrawalNotReady();
 error BunniHub__BunniTokenNotInitialized();
 error BunniHub__NeedToUseQueuedWithdrawal();

@@ -597,7 +597,7 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     function _getHookParams(PoolId poolId) internal view returns (bytes memory result) {
         address ptr = s.poolState[poolId].immutableParamsPointer;
         if (ptr == address(0)) return bytes("");
-        result = ptr.read({start: 156});
+        result = ptr.read({start: 160});
     }
 
     function _updateBalance(uint256 balance, int256 delta) internal pure returns (uint256) {

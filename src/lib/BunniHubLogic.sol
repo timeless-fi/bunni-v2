@@ -685,9 +685,33 @@ library BunniHubLogic {
             params.targetRawTokenRatio1,
             params.maxRawTokenRatio1
         );
-        immutableParams = bytes.concat(
-            immutableParams, abi.encodePacked(params.hooklet, params.hookParams.length.toUint16(), params.hookParams)
-        );
+        {
+            uint8 currency0Decimals =
+                params.currency0.isAddressZero() ? 18 : IERC20(Currency.unwrap(params.currency0)).decimals();
+            uint8 currency1Decimals =
+                params.currency1.isAddressZero() ? 18 : IERC20(Currency.unwrap(params.currency1)).decimals();
+            uint8 vault0Decimals = params.vault0 == ERC4626(address(0)) ? 0 : params.vault0.decimals();
+            uint8 vault1Decimals = params.vault1 == ERC4626(address(0)) ? 0 : params.vault1.decimals();
+            if (
+                (params.vault0 != ERC4626(address(0)) && 18 + vault0Decimals < currency0Decimals)
+                    || (params.vault1 != ERC4626(address(0)) && 18 + vault1Decimals < currency1Decimals)
+            ) {
+                // need to ensure that the share price can be computed without underflow
+                revert BunniHub__VaultDecimalsTooSmall();
+            }
+            immutableParams = bytes.concat(
+                immutableParams,
+                abi.encodePacked(
+                    params.hooklet,
+                    currency0Decimals,
+                    currency1Decimals,
+                    vault0Decimals,
+                    vault1Decimals,
+                    params.hookParams.length.toUint16(),
+                    params.hookParams
+                )
+            );
+        }
         s.poolState[poolId].immutableParamsPointer = immutableParams.write();
 
         /// -----------------------------------------------------------------------

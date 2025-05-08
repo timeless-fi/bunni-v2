@@ -665,10 +665,23 @@ library BunniHookLogic {
             VaultSharePrices memory prevSharePrices = s.vaultSharePricesAtLastSwap[id];
 
             // compute current share prices
-            uint120 sharePrice0 =
-                bunniState.reserve0 == 0 ? 0 : reserveBalance0.divWadUp(bunniState.reserve0).toUint120();
-            uint120 sharePrice1 =
-                bunniState.reserve1 == 0 ? 0 : reserveBalance1.divWadUp(bunniState.reserve1).toUint120();
+            // need to rescale token/vault balances to use 18 decimals
+            // sharePrice = (reserveBalance * (10**18) / (10**currencyDecimals)) * (10**18) / (reserve * (10**18) / (10**vaultDecimals))
+            // = reserveBalance * (10**(18 + vaultDecimals - currencyDecimals)) / reserve
+            // (18 + vaultDecimals - currencyDecimals) is always >= 0 since it's verified in BunniHubLogic::deployBunniToken()
+            // unless vault is address(0) but then the reserve will always be 0 so rescaleFactor is irrelevant
+            uint8 rescaleFactor0;
+            uint8 rescaleFactor1;
+            unchecked {
+                rescaleFactor0 = 18 + bunniState.vault0Decimals - bunniState.currency0Decimals;
+                rescaleFactor1 = 18 + bunniState.vault1Decimals - bunniState.currency1Decimals;
+            }
+            uint120 sharePrice0 = bunniState.reserve0 == 0
+                ? 0
+                : reserveBalance0.mulDivUp(10 ** rescaleFactor0, bunniState.reserve0).toUint120();
+            uint120 sharePrice1 = bunniState.reserve1 == 0
+                ? 0
+                : reserveBalance1.mulDivUp(10 ** rescaleFactor1, bunniState.reserve1).toUint120();
 
             // compare with share prices at last swap to see if we need to apply the surge fee
             // surge fee is applied if the share price has increased by more than 1 / vaultSurgeThreshold
