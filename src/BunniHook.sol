@@ -55,7 +55,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// Immutable args
     /// -----------------------------------------------------------------------
 
-    uint48 internal immutable _K;
     WETH internal immutable weth;
     IBunniHub internal immutable hub;
     address internal immutable permit2;
@@ -85,6 +84,9 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
 
     /// @notice Used for computing the referral reward amount. Reward is `hookFee * referralRewardModifier / 1e6`.
     uint32 internal referralRewardModifier;
+
+    /// @notice The K constant used in am-AMM.
+    uint48 internal _K;
 
     /// @notice The FloodZone contract used in rebalance orders.
     IZone internal floodZone;
@@ -118,7 +120,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         floodPlain = floodPlain_;
         permit2 = address(floodPlain_.PERMIT2());
         weth = weth_;
-        _K = k_;
         require(
             address(hub_) != address(0) && address(floodPlain_) != address(0) && address(permit2) != address(0)
                 && address(weth_) != address(0) && owner_ != address(0) && k_ != 0
@@ -128,6 +129,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         hookFeeModifier = hookFeeModifier_;
         referralRewardModifier = referralRewardModifier_;
         floodZone = floodZone_;
+        _K = k_;
 
         _initializeOwner(owner_);
         poolManager_.setOperator(address(hub_), true);
@@ -318,6 +320,13 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     function setWithdrawalUnblocked(PoolId id, bool unblocked) external onlyOwner {
         withdrawalUnblocked[id] = unblocked;
         emit SetWithdrawalUnblocked(id, unblocked);
+    }
+
+    /// @inheritdoc IBunniHook
+    function setK(uint48 newK) external onlyOwner {
+        if (newK <= _K) revert BunniHook__InvalidK();
+        _K = newK;
+        emit SetK(newK);
     }
 
     /// -----------------------------------------------------------------------
