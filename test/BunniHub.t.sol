@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
 
+import {ERC20CustomDecimalsMock} from "./mocks/ERC20CustomDecimalsMock.sol";
+import {ERC4626CustomDecimalsMock} from "./mocks/ERC4626CustomDecimalsMock.sol";
+
 import "./BaseTest.sol";
 
 contract BunniHubTest is BaseTest {
@@ -529,7 +532,7 @@ contract BunniHubTest is BaseTest {
                 ldfParams: ldfParams,
                 hooks: bunniHook,
                 hookParams: hookParams,
-                vault0: ERC4626(address(0)),
+                vault0: vault0,
                 vault1: ERC4626(address(0)),
                 minRawTokenRatio0: 0.08e6,
                 targetRawTokenRatio0: 0.1e6,
@@ -578,7 +581,7 @@ contract BunniHubTest is BaseTest {
         assertEq(state.ldfParams, ldfParams, "ldfParams incorrect");
         assertEq(state.hookParams, hookParams, "hookParams incorrect");
         assertEq(hub.hookParams(id), hookParams, "hub.hookParams() incorrect");
-        assertEq(address(state.vault0), address(0), "vault0 incorrect");
+        assertEq(address(state.vault0), address(vault0), "vault0 incorrect");
         assertEq(address(state.vault1), address(0), "vault1 incorrect");
         assertEq(uint8(state.ldfType), uint8(LDFType.DYNAMIC_AND_STATEFUL), "ldfType incorrect");
         assertEq(state.minRawTokenRatio0, 0.08e6, "minRawTokenRatio0 incorrect");
@@ -587,6 +590,10 @@ contract BunniHubTest is BaseTest {
         assertEq(state.minRawTokenRatio1, 0.08e6, "minRawTokenRatio1 incorrect");
         assertEq(state.targetRawTokenRatio1, 0.1e6, "targetRawTokenRatio1 incorrect");
         assertEq(state.maxRawTokenRatio1, 0.12e6, "maxRawTokenRatio1 incorrect");
+        assertEq(state.currency0Decimals, token0.decimals(), "currency0Decimals incorrect");
+        assertEq(state.currency1Decimals, token1.decimals(), "currency1Decimals incorrect");
+        assertEq(state.vault0Decimals, vault0.decimals(), "vault0Decimals incorrect");
+        assertEq(state.vault1Decimals, 0, "vault1Decimals incorrect");
         assertEq(address(state.hooklet), address(hooklet_), "hooklet incorrect");
 
         // verify decoded hookParams
@@ -607,6 +614,62 @@ contract BunniHubTest is BaseTest {
         assertEq(p.oracleMinInterval, ORACLE_MIN_INTERVAL, "oracleMinInterval incorrect");
         assertEq(p.maxAmAmmFee, POOL_MAX_AMAMM_FEE, "maxAmAmmFee incorrect");
         assertEq(p.minRentMultiplier, MIN_RENT_MULTIPLIER, "minRentMultiplier incorrect");
+    }
+
+    function test_revert_deployBunniToken_vaultDecimalsTooSmall() public {
+        bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.BOTH, int24(-3) * TICK_SPACING, int16(6), ALPHA));
+        bytes memory hookParams = abi.encodePacked(
+            FEE_MIN,
+            FEE_MAX,
+            FEE_QUADRATIC_MULTIPLIER,
+            FEE_TWAP_SECONDS_AGO,
+            POOL_MAX_AMAMM_FEE,
+            SURGE_HALFLIFE,
+            SURGE_AUTOSTART_TIME,
+            VAULT_SURGE_THRESHOLD_0,
+            VAULT_SURGE_THRESHOLD_1,
+            REBALANCE_THRESHOLD,
+            REBALANCE_MAX_SLIPPAGE,
+            REBALANCE_TWAP_SECONDS_AGO,
+            REBALANCE_ORDER_TTL,
+            true, // amAmmEnabled
+            ORACLE_MIN_INTERVAL,
+            MIN_RENT_MULTIPLIER
+        );
+
+        // 18 + vaultDecimals < tokenDecimals
+        // thus it should revert
+        ERC20CustomDecimalsMock token = new ERC20CustomDecimalsMock(36);
+        ERC4626CustomDecimalsMock vault = new ERC4626CustomDecimalsMock(token, 6);
+        vm.expectRevert(BunniHub__VaultDecimalsTooSmall.selector);
+        hub.deployBunniToken(
+            IBunniHub.DeployBunniTokenParams({
+                currency0: Currency.wrap(address(token)),
+                currency1: Currency.wrap(address(token1)),
+                tickSpacing: TICK_SPACING,
+                twapSecondsAgo: TWAP_SECONDS_AGO,
+                liquidityDensityFunction: ldf,
+                hooklet: IHooklet(address(0)),
+                ldfType: LDFType.DYNAMIC_AND_STATEFUL,
+                ldfParams: ldfParams,
+                hooks: bunniHook,
+                hookParams: hookParams,
+                vault0: vault,
+                vault1: vault1,
+                minRawTokenRatio0: 0.08e6,
+                targetRawTokenRatio0: 0.1e6,
+                maxRawTokenRatio0: 0.12e6,
+                minRawTokenRatio1: 0.08e6,
+                targetRawTokenRatio1: 0.1e6,
+                maxRawTokenRatio1: 0.12e6,
+                sqrtPriceX96: uint160(Q96),
+                name: "BunniToken",
+                symbol: "BUNNI",
+                owner: address(this),
+                metadataURI: "",
+                salt: bytes32(0)
+            })
+        );
     }
 
     function test_DoS_pool() public {

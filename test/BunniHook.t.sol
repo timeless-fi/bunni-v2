@@ -722,9 +722,7 @@ contract BunniHookTest is BaseTest {
 
     function test_fuzz_swapNoArb_double(
         uint256 swapAmount,
-        bool zeroForOneFirstSwap,
-        bool useVault0,
-        bool useVault1,
+        bytes3 flags,
         uint256 waitTime,
         uint32 alpha,
         uint24 feeMin,
@@ -736,6 +734,10 @@ contract BunniHookTest is BaseTest {
         feeMin = uint24(bound(feeMin, 0, 1e6 - 1));
         feeMax = uint24(bound(feeMax, feeMin, 1e6 - 1));
         alpha = uint32(bound(alpha, 1e3, 12e8));
+
+        bool zeroForOneFirstSwap = uint8(flags[0]) % 2 == 0;
+        bool useVault0 = uint8(flags[1]) % 2 == 0;
+        bool useVault1 = uint8(flags[2]) % 2 == 0;
 
         GeometricDistribution ldf_ = new GeometricDistribution(address(hub), address(bunniHook), address(quoter));
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.BOTH, int24(-3) * TICK_SPACING, int16(6), alpha));
