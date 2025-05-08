@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.4;
 
+import {Ownable} from "solady/auth/Ownable.sol";
+
 import "./BaseTest.sol";
 
 contract BunniHookTest is BaseTest {
@@ -1674,6 +1676,23 @@ contract BunniHookTest is BaseTest {
         (uint256 balanceAfter, bool isToken0After) = idleBalanceAfter.fromIdleBalance();
         assertLt(balanceAfter, balanceBefore, "idle balance should be reduced");
         assertFalse(isToken0After, "idle balance should still be in token1");
+    }
+
+    function test_setK_revertWhenNewKIsNotGreaterThanCurrentK() public {
+        vm.expectRevert(BunniHook__InvalidK.selector);
+        bunniHook.setK(100);
+    }
+
+    function test_setK_succeedsWhenNewKIsGreaterThanCurrentK() public {
+        vm.expectEmit(true, true, true, true);
+        emit IBunniHook.SetK(10000);
+        bunniHook.setK(10000);
+    }
+
+    function test_setK_onlyOwner() public {
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vm.prank(address(0x1234));
+        bunniHook.setK(10000);
     }
 
     // Implementation of IFulfiller interface
