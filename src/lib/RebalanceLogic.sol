@@ -22,6 +22,7 @@ import "../base/SharedStructs.sol";
 import {Oracle} from "./Oracle.sol";
 import {queryLDF} from "./QueryLDF.sol";
 import {FullMathX96} from "./FullMathX96.sol";
+import {BlockNumberLib} from "./BlockNumberLib.sol";
 import {BunniHookLogic} from "./BunniHookLogic.sol";
 import {OrderHashMemory} from "./OrderHashMemory.sol";
 
@@ -218,7 +219,7 @@ library RebalanceLogic {
             offer: offer,
             consideration: consideration,
             deadline: block.timestamp + rebalanceOrderTTL,
-            nonce: uint256(keccak256(abi.encode(block.number, id))), // combine block.number and pool id to avoid nonce collisions between pools
+            nonce: uint256(keccak256(abi.encode(BlockNumberLib.getBlockNumber(), id))), // combine block number and pool id to avoid nonce collisions between pools
             preHooks: preHooks,
             postHooks: postHooks
         });
