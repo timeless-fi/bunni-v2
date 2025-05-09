@@ -10,6 +10,7 @@ import "../base/Constants.sol";
 import "./LibGeometricDistribution.sol";
 
 library LibBuyTheDipGeometricDistribution {
+    using TickMath for *;
     using FixedPointMathLib for uint256;
 
     uint256 internal constant MIN_ALPHA = 1e3;
@@ -588,6 +589,11 @@ library LibBuyTheDipGeometricDistribution {
 
         // ensure alpha is in range
         if (alpha < MIN_ALPHA || alpha > MAX_ALPHA || alpha == ALPHA_BASE) return false;
+
+        // ensure alpha != sqrtRatioTickSpacing which would cause cum0 to always be 0
+        uint256 alphaX96 = alpha.mulDiv(Q96, ALPHA_BASE);
+        uint160 sqrtRatioTickSpacing = tickSpacing.getSqrtPriceAtTick();
+        if (alphaX96 == sqrtRatioTickSpacing) return false;
 
         // ensure the ticks are within the valid range
         if (shiftMode == uint8(ShiftMode.STATIC)) {
