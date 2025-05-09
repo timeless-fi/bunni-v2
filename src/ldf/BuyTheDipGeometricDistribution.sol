@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import {Guarded} from "../base/Guarded.sol";
+import {LDFType} from "../types/LDFType.sol";
 import {LibBuyTheDipGeometricDistribution} from "./LibBuyTheDipGeometricDistribution.sol";
 import {ILiquidityDensityFunction} from "../interfaces/ILiquidityDensityFunction.sol";
 
@@ -184,13 +185,13 @@ contract BuyTheDipGeometricDistribution is ILiquidityDensityFunction, Guarded {
     }
 
     /// @inheritdoc ILiquidityDensityFunction
-    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams)
+    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
         external
         pure
         override
         returns (bool)
     {
-        return LibBuyTheDipGeometricDistribution.isValidParams(key.tickSpacing, twapSecondsAgo, ldfParams);
+        return LibBuyTheDipGeometricDistribution.isValidParams(key.tickSpacing, twapSecondsAgo, ldfParams, ldfType);
     }
 
     function _decodeState(bytes32 ldfState) internal pure returns (bool initialized, int24 lastTwapTick) {

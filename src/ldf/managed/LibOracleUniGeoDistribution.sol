@@ -9,6 +9,7 @@ import "../../lib/Math.sol";
 import "../../base/Constants.sol";
 import "../LibUniformDistribution.sol";
 import "../LibGeometricDistribution.sol";
+import {LDFType} from "../../types/LDFType.sol";
 
 library LibOracleUniGeoDistribution {
     using FixedPointMathLib for uint256;
@@ -412,7 +413,11 @@ library LibOracleUniGeoDistribution {
         }
     }
 
-    function isValidParams(int24 tickSpacing, bytes32 ldfParams, int24 oracleTick) internal pure returns (bool) {
+    function isValidParams(int24 tickSpacing, bytes32 ldfParams, int24 oracleTick, LDFType ldfType)
+        internal
+        pure
+        returns (bool)
+    {
         // decode params
         // | shiftMode - 1 byte | distributionType - 1 byte | oracleIsTickLower - 1 byte | oracleTickOffset - 2 bytes | nonOracleTick - 3 bytes | alpha - 4 bytes |
         uint8 shiftMode = uint8(bytes1(ldfParams));
@@ -443,12 +448,13 @@ library LibOracleUniGeoDistribution {
         // - geometric LDF params are valid
         // - uniform LDF params are valid
         // - shiftMode is static
+        // - ldfType is DYNAMIC_AND_STATEFUL
         // - distributionType is valid
         // - oracleTickOffset is aligned to tickSpacing
         // - nonOracleTick is aligned to tickSpacing
-        return LibGeometricDistribution.isValidParams(tickSpacing, 0, geometricLdfParams)
+        return LibGeometricDistribution.isValidParams(tickSpacing, 0, geometricLdfParams, LDFType.STATIC) // LDFType.STATIC is used since the geometric LDF doesn't shift
             && tickLower % tickSpacing == 0 && tickUpper % tickSpacing == 0 && tickLower >= minUsableTick
-            && tickUpper <= maxUsableTick && shiftMode == uint8(ShiftMode.STATIC)
+            && tickUpper <= maxUsableTick && shiftMode == uint8(ShiftMode.STATIC) && ldfType == LDFType.DYNAMIC_AND_STATEFUL
             && distributionType <= uint8(type(DistributionType).max) && oracleTickOffset % tickSpacing == 0
             && nonOracleTick % tickSpacing == 0;
     }

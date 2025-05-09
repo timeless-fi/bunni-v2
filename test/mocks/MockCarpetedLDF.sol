@@ -7,6 +7,7 @@ import {PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import "../../src/ldf/ShiftMode.sol";
 import {Guarded} from "../../src/base/Guarded.sol";
+import {LDFType} from "../../src/types/LDFType.sol";
 import {ILiquidityDensityFunction} from "../../src/interfaces/ILiquidityDensityFunction.sol";
 import {LibCarpetedGeometricDistribution} from "../../src/ldf/LibCarpetedGeometricDistribution.sol";
 
@@ -140,13 +141,13 @@ contract MockCarpetedLDF is ILiquidityDensityFunction, Guarded {
         );
     }
 
-    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams)
+    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
         external
         pure
         override
         returns (bool)
     {
-        return LibCarpetedGeometricDistribution.isValidParams(key.tickSpacing, twapSecondsAgo, ldfParams);
+        return LibCarpetedGeometricDistribution.isValidParams(key.tickSpacing, twapSecondsAgo, ldfParams, ldfType);
     }
 
     function _decodeState(bytes32 ldfState) internal pure returns (bool initialized, int24 lastMinTick) {

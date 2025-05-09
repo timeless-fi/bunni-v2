@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
+import {LDFType} from "../../src/types/LDFType.sol";
 import {ShiftMode} from "../../src/ldf/ShiftMode.sol";
 import {ILiquidityDensityFunction} from "../../src/interfaces/ILiquidityDensityFunction.sol";
 import {BuyTheDipGeometricDistribution} from "../../src/ldf/BuyTheDipGeometricDistribution.sol";
@@ -32,7 +33,7 @@ contract BuyTheDipGeometricDistributionTest is Test {
         bytes32 ldfParams = bytes32(
             abi.encodePacked(ShiftMode.STATIC, minTick, length, alpha, altAlpha, altThreshold, altThresholdDirection)
         );
-        assertTrue(ldf.isValidParams(key, 1 minutes, ldfParams), "LDF params are invalid");
+        assertTrue(ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "LDF params are invalid");
 
         // make first query
         (uint256 liquidityDensityX96,,, bytes32 ldfState, bool shouldSurge) = ldf.query({
@@ -98,7 +99,7 @@ contract BuyTheDipGeometricDistributionTest is Test {
         bytes32 ldfParams = bytes32(
             abi.encodePacked(ShiftMode.STATIC, minTick, length, alpha, altAlpha, altThreshold, altThresholdDirection)
         );
-        assertTrue(ldf.isValidParams(key, 1 minutes, ldfParams), "LDF params are invalid");
+        assertTrue(ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "LDF params are invalid");
 
         // validity conditions:
         // - need TWAP to be enabled to trigger the alt alpha switch
@@ -108,25 +109,29 @@ contract BuyTheDipGeometricDistributionTest is Test {
         // - does not exceed minUsableTick or maxUsableTick
 
         // invalid TWAP
-        assertFalse(ldf.isValidParams(key, 0, ldfParams), "allow 0 TWAP window");
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "allow 0 TWAP window");
 
         // invalid LDFs
         ldfParams = bytes32(
             abi.encodePacked(ShiftMode.STATIC, minTick, length, alpha, uint32(1e8), altThreshold, altThresholdDirection)
         );
-        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams), "allow invalid alt alpha");
+        assertFalse(
+            ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "allow invalid alt alpha"
+        );
         ldfParams = bytes32(
             abi.encodePacked(
                 ShiftMode.STATIC, minTick, length, uint32(1e8), altAlpha, altThreshold, altThresholdDirection
             )
         );
-        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams), "allow invalid alpha");
+        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "allow invalid alpha");
 
         // invalid threshold
         ldfParams = bytes32(
             abi.encodePacked(ShiftMode.STATIC, minTick, length, alpha, altAlpha, minTick, altThresholdDirection)
         );
-        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams), "allow invalid threshold");
+        assertFalse(
+            ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "allow invalid threshold"
+        );
         ldfParams = bytes32(
             abi.encodePacked(
                 ShiftMode.STATIC,
@@ -138,7 +143,9 @@ contract BuyTheDipGeometricDistributionTest is Test {
                 altThresholdDirection
             )
         );
-        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams), "allow invalid threshold");
+        assertFalse(
+            ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "allow invalid threshold"
+        );
 
         // invalid alpha and altAlpha combo
         ldfParams = bytes32(
@@ -146,7 +153,10 @@ contract BuyTheDipGeometricDistributionTest is Test {
                 ShiftMode.STATIC, minTick, length, uint32(1.2e8), uint32(1.5e8), altThreshold, altThresholdDirection
             )
         );
-        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams), "allow invalid alpha and alt alpha combo");
+        assertFalse(
+            ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL),
+            "allow invalid alpha and alt alpha combo"
+        );
 
         // exceeds min/max usable ticks
         (int24 minUsableTick, int24 maxUsableTick) =
@@ -162,7 +172,9 @@ contract BuyTheDipGeometricDistributionTest is Test {
                 altThresholdDirection
             )
         );
-        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams), "allow below min usable tick");
+        assertFalse(
+            ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "allow below min usable tick"
+        );
         ldfParams = bytes32(
             abi.encodePacked(
                 ShiftMode.STATIC,
@@ -174,6 +186,14 @@ contract BuyTheDipGeometricDistributionTest is Test {
                 altThresholdDirection
             )
         );
-        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams), "allow above max usable tick");
+        assertFalse(
+            ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "allow above max usable tick"
+        );
+
+        // invalid ldfType
+        ldfParams = bytes32(
+            abi.encodePacked(ShiftMode.STATIC, minTick, length, alpha, altAlpha, altThreshold, altThresholdDirection)
+        );
+        assertFalse(ldf.isValidParams(key, 1 minutes, ldfParams, LDFType.STATIC), "allow invalid ldfType");
     }
 }

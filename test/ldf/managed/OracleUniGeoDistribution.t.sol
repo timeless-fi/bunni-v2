@@ -11,6 +11,7 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 
 import {MockOracle} from "../../mocks/MockOracle.sol";
+import {LDFType} from "../../../src/types/LDFType.sol";
 import {OracleUniGeoDistribution} from "../../../src/ldf/managed/OracleUniGeoDistribution.sol";
 import {LibOracleUniGeoDistribution} from "../../../src/ldf/managed/LibOracleUniGeoDistribution.sol";
 import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
@@ -613,12 +614,20 @@ contract OracleUniGeoDistributionTest is Test {
             nonOracleTick: TICK_SPACING * 10,
             alpha: 1 // Invalid: alpha too small
         });
-        assertFalse(ldf.isValidParams(key, 0, invalidAlpha), "Should reject invalid alpha");
+        assertFalse(
+            ldf.isValidParams(key, 0, invalidAlpha, LDFType.DYNAMIC_AND_STATEFUL), "Should reject invalid alpha"
+        );
 
         // Test invalid distribution type
         bytes32 defaultParams = _createDefaultParams();
         bytes32 invalidType = bytes32(bytes2(0x00FF)) | defaultParams; // Invalid distribution type
-        assertFalse(ldf.isValidParams(key, 0, invalidType), "Should reject invalid distribution type");
+        assertFalse(
+            ldf.isValidParams(key, 0, invalidType, LDFType.DYNAMIC_AND_STATEFUL),
+            "Should reject invalid distribution type"
+        );
+
+        // Test invalid ldfType
+        assertFalse(ldf.isValidParams(key, 0, defaultParams, LDFType.STATIC), "Should reject invalid ldfType");
     }
 
     struct TestCase {

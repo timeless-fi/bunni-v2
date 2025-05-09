@@ -598,7 +598,9 @@ library BunniHubLogic {
             hooks: IHooks(address(params.hooks))
         });
         if (address(params.liquidityDensityFunction) == address(0)) revert BunniHub__LDFCannotBeZero();
-        if (!params.liquidityDensityFunction.isValidParams(key, params.twapSecondsAgo, params.ldfParams)) {
+        if (
+            !params.liquidityDensityFunction.isValidParams(key, params.twapSecondsAgo, params.ldfParams, params.ldfType)
+        ) {
             revert BunniHub__InvalidLDFParams();
         }
 

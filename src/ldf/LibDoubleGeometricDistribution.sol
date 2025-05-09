@@ -9,6 +9,7 @@ import "../lib/Math.sol";
 import "../lib/ExpMath.sol";
 import "../base/Constants.sol";
 import "./LibGeometricDistribution.sol";
+import {LDFType} from "../types/LDFType.sol";
 
 library LibDoubleGeometricDistribution {
     using SafeCastLib for uint256;
@@ -593,7 +594,11 @@ library LibDoubleGeometricDistribution {
         }
     }
 
-    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams) internal pure returns (bool) {
+    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
+        internal
+        pure
+        returns (bool)
+    {
         // | shiftMode - 1 byte | minTickOrOffset - 3 bytes | length0 - 2 bytes | alpha0 - 4 bytes | weight0 - 4 bytes | length1 - 2 bytes | alpha1 - 2 bytes | weight1 - 4 bytes |
         uint8 shiftMode = uint8(bytes1(ldfParams));
         int24 minTickOrOffset = int24(uint24(bytes3(ldfParams << 8)));
@@ -615,12 +620,16 @@ library LibDoubleGeometricDistribution {
         ) return false;
 
         return LibGeometricDistribution.isValidParams(
-            tickSpacing, twapSecondsAgo, bytes32(abi.encodePacked(shiftMode, minTickOrOffset, int16(length1), alpha1))
+            tickSpacing,
+            twapSecondsAgo,
+            bytes32(abi.encodePacked(shiftMode, minTickOrOffset, int16(length1), alpha1)),
+            ldfType
         )
             && LibGeometricDistribution.isValidParams(
                 tickSpacing,
                 twapSecondsAgo,
-                bytes32(abi.encodePacked(shiftMode, minTickOrOffset + length1 * tickSpacing, int16(length0), alpha0))
+                bytes32(abi.encodePacked(shiftMode, minTickOrOffset + length1 * tickSpacing, int16(length0), alpha0)),
+                ldfType
             ) && weight0 != 0 && weight1 != 0
             && checkMinLiquidityDensity(Q96, tickSpacing, length0, alpha0, weight0, length1, alpha1, weight1);
     }

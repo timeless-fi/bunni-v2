@@ -9,6 +9,7 @@ import "../lib/Math.sol";
 import "../lib/ExpMath.sol";
 import "../base/Constants.sol";
 import "./LibUniformDistribution.sol";
+import {LDFType} from "../types/LDFType.sol";
 import "./LibDoubleGeometricDistribution.sol";
 
 library LibCarpetedDoubleGeometricDistribution {
@@ -543,7 +544,11 @@ library LibCarpetedDoubleGeometricDistribution {
         leftCarpetLiquidity = carpetLiquidity - rightCarpetLiquidity;
     }
 
-    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams) internal pure returns (bool) {
+    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
+        internal
+        pure
+        returns (bool)
+    {
         // | shiftMode - 1 byte | minTickOrOffset - 3 bytes | length0 - 2 bytes | alpha0 - 4 bytes | weight0 - 4 bytes | length1 - 2 bytes | alpha1 - 4 bytes | weight1 - 4 bytes | weightCarpet - 4 bytes |
         int24 length0 = int24(int16(uint16(bytes2(ldfParams << 32))));
         uint32 alpha0 = uint32(bytes4(ldfParams << 48));
@@ -553,7 +558,8 @@ library LibCarpetedDoubleGeometricDistribution {
         uint32 weight1 = uint32(bytes4(ldfParams << 160));
         uint32 weightCarpet = uint32(bytes4(ldfParams << 192));
 
-        return LibDoubleGeometricDistribution.isValidParams(tickSpacing, twapSecondsAgo, ldfParams) && weightCarpet != 0
+        return LibDoubleGeometricDistribution.isValidParams(tickSpacing, twapSecondsAgo, ldfParams, ldfType)
+            && weightCarpet != 0
             && LibDoubleGeometricDistribution.checkMinLiquidityDensity(
                 Q96.mulWad(WAD - weightCarpet), tickSpacing, length0, alpha0, weight0, length1, alpha1, weight1
             );

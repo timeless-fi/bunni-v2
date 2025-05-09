@@ -5,6 +5,8 @@ pragma abicoder v2;
 
 import {PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
+import {LDFType} from "../types/LDFType.sol";
+
 /// @title ILiquidityDensityFunction
 /// @author zefram.eth
 /// @notice Interface for liquidity density functions (LDFs) that dictate how liquidity is distributed over a pool's rounded ticks (each with `tickSpacing` ticks).
@@ -123,8 +125,9 @@ interface ILiquidityDensityFunction {
     /// @param key The key of the Uniswap v4 pool
     /// @param twapSecondsAgo The time window for the TWAP
     /// @param ldfParams The parameters for the liquidity density function
+    /// @param ldfType The type of LDF, see LDFType.sol for details.
     /// @return Whether the parameters are valid
-    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams)
+    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
         external
         view
         returns (bool);

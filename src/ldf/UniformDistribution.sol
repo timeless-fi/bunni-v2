@@ -5,6 +5,7 @@ import {PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import "./ShiftMode.sol";
 import {Guarded} from "../base/Guarded.sol";
+import {LDFType} from "../types/LDFType.sol";
 import {LibUniformDistribution} from "./LibUniformDistribution.sol";
 import {ILiquidityDensityFunction} from "../interfaces/ILiquidityDensityFunction.sol";
 
@@ -140,13 +141,13 @@ contract UniformDistribution is ILiquidityDensityFunction, Guarded {
     }
 
     /// @inheritdoc ILiquidityDensityFunction
-    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams)
+    function isValidParams(PoolKey calldata key, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
         external
         pure
         override
         returns (bool)
     {
-        return LibUniformDistribution.isValidParams(key.tickSpacing, twapSecondsAgo, ldfParams);
+        return LibUniformDistribution.isValidParams(key.tickSpacing, twapSecondsAgo, ldfParams, ldfType);
     }
 
     function _decodeState(bytes32 ldfState) internal pure returns (bool initialized, int24 lastTickLower) {

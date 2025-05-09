@@ -28,7 +28,7 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
         _test_liquidityDensity_sumUpToOne(tickSpacing, ldfParams);
     }
 
@@ -51,7 +51,7 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
         _test_query_cumulativeAmounts(currentTick, tickSpacing, ldfParams);
     }
 
@@ -72,7 +72,7 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 maxCumulativeAmount0 =
             LibUniformDistribution.cumulativeAmount0(minUsableTick, liquidity, tickSpacing, tickLower, tickUpper, false);
@@ -123,7 +123,7 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 maxCumulativeAmount1 =
             LibUniformDistribution.cumulativeAmount1(maxUsableTick, liquidity, tickSpacing, tickLower, tickUpper, false);
@@ -166,17 +166,17 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         // invalid when minTick < minUsableTick
         (int24 tickLower, int24 tickUpper) = (minUsableTick - tickSpacing, minUsableTick + tickSpacing);
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // invalid when maxTick > maxUsableTick
         (tickLower, tickUpper) = (maxUsableTick - tickSpacing, maxUsableTick + tickSpacing);
         ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // valid test
         (tickLower, tickUpper) = (0, tickSpacing);
         ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        assertTrue(ldf.isValidParams(key, 0, ldfParams));
+        assertTrue(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
     }
 
     function test_boundary_dynamic_boundedWhenDecoding(int24 tickSpacing) external view {
@@ -190,7 +190,7 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         // bounded when minTick < minUsableTick
         (int24 offset, int24 length) = (minUsableTick - tickSpacing, 2);
         bytes32 ldfParams = bytes32(abi.encodePacked(shiftMode, offset, length));
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 0");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 0");
         (int24 tickLower, int24 tickUpper, ShiftMode decodedShiftMode) =
             LibUniformDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(tickLower, minUsableTick, "tickLower incorrect");
@@ -199,7 +199,7 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         // bounded when maxTick > maxUsableTick
         (offset, length) = (maxUsableTick - tickSpacing, 2);
         ldfParams = bytes32(abi.encodePacked(shiftMode, offset, length));
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 1");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 1");
         (tickLower, tickUpper, decodedShiftMode) = LibUniformDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(tickUpper, maxUsableTick, "tickUpper incorrect");
         assertTrue(decodedShiftMode == shiftMode, "shiftMode incorrect");
@@ -207,7 +207,7 @@ contract UniformDistributionTest is LiquidityDensityFunctionTest {
         // bounded when minTick < minUsableTick and maxTick > maxUsableTick
         (offset, length) = (minUsableTick - tickSpacing, (maxUsableTick - minUsableTick) / tickSpacing + 2);
         ldfParams = bytes32(abi.encodePacked(shiftMode, offset, length));
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 2");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 2");
         (tickLower, tickUpper, decodedShiftMode) = LibUniformDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(tickLower, minUsableTick, "tickLower incorrect");
         assertEq(tickUpper, maxUsableTick, "tickUpper incorrect");

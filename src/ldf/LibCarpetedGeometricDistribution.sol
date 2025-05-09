@@ -10,6 +10,7 @@ import "../lib/ExpMath.sol";
 import "../base/Constants.sol";
 import "./LibUniformDistribution.sol";
 import "./LibGeometricDistribution.sol";
+import {LDFType} from "../types/LDFType.sol";
 
 library LibCarpetedGeometricDistribution {
     using SafeCastLib for uint256;
@@ -557,13 +558,17 @@ library LibCarpetedGeometricDistribution {
         weightCarpet = uint32(bytes4(ldfParams << 80));
     }
 
-    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams) internal pure returns (bool) {
+    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
+        internal
+        pure
+        returns (bool)
+    {
         // | shiftMode - 1 byte | minTickOrOffset - 3 bytes | length - 2 bytes | alpha - 4 bytes | weightCarpet - 4 bytes |
         int24 length = int24(int16(uint16(bytes2(ldfParams << 32))));
         uint32 alpha = uint32(bytes4(ldfParams << 48));
         uint32 weightCarpet = uint32(bytes4(ldfParams << 80));
 
-        return LibGeometricDistribution.isValidParams(tickSpacing, twapSecondsAgo, ldfParams) && weightCarpet != 0
-            && checkMinLiquidityDensity(tickSpacing, length, alpha, weightCarpet);
+        return LibGeometricDistribution.isValidParams(tickSpacing, twapSecondsAgo, ldfParams, ldfType)
+            && weightCarpet != 0 && checkMinLiquidityDensity(tickSpacing, length, alpha, weightCarpet);
     }
 }

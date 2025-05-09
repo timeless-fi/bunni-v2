@@ -10,6 +10,7 @@ import "./ShiftMode.sol";
 import "../lib/Math.sol";
 import "../lib/ExpMath.sol";
 import "../base/Constants.sol";
+import {LDFType} from "../types/LDFType.sol";
 import {FullMathX96} from "../lib/FullMathX96.sol";
 
 library LibGeometricDistribution {
@@ -736,7 +737,11 @@ library LibGeometricDistribution {
         }
     }
 
-    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams) internal pure returns (bool) {
+    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
+        internal
+        pure
+        returns (bool)
+    {
         (int24 minUsableTick, int24 maxUsableTick) =
             (TickMath.minUsableTick(tickSpacing), TickMath.maxUsableTick(tickSpacing));
 
@@ -751,8 +756,14 @@ library LibGeometricDistribution {
             return false;
         }
 
-        // ensure twapSecondsAgo is non-zero if shiftMode is not static
-        if (shiftMode != uint8(ShiftMode.STATIC) && twapSecondsAgo == 0) {
+        if (shiftMode != uint8(ShiftMode.STATIC)) {
+            // LDF shifts
+            // ensure twapSecondsAgo is non-zero and ldfType is DYNAMIC_AND_STATEFUL
+            if (twapSecondsAgo == 0 || ldfType != LDFType.DYNAMIC_AND_STATEFUL) return false;
+        }
+
+        // ensure ldfType is STATIC if shiftMode is static
+        if (shiftMode == uint8(ShiftMode.STATIC) && ldfType != LDFType.STATIC) {
             return false;
         }
 
