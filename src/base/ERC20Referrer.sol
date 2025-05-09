@@ -310,13 +310,16 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
             mstore(0x20, amount)
             log3(0x20, 0x20, _TRANSFER_EVENT_SIGNATURE, msgSender, to)
         }
-        _afterTokenTransfer(msgSender, to, amount);
 
         // Unlocker callback if `to` is locked.
         if (toLocked) {
             IERC20Unlocker unlocker = unlockerOf(to);
             unlocker.lockedUserReceiveCallback(to, amount);
         }
+
+        // After token transfer hook
+        // Must be called after the unlocker callback to prevent reentrancy
+        _afterTokenTransfer(msgSender, to, amount);
 
         return true;
     }
@@ -405,13 +408,16 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
             mstore(0x20, amount)
             log3(0x20, 0x20, _TRANSFER_EVENT_SIGNATURE, from, to)
         }
-        _afterTokenTransfer(from, to, amount);
 
         // Unlocker callback if `to` is locked.
         if (toLocked) {
             IERC20Unlocker unlocker = unlockerOf(to);
             unlocker.lockedUserReceiveCallback(to, amount);
         }
+
+        // After token transfer hook
+        // Must be called after the unlocker callback to prevent reentrancy
+        _afterTokenTransfer(from, to, amount);
 
         return true;
     }
@@ -465,13 +471,16 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
             mstore(0x20, amount)
             log3(0x20, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, to)
         }
-        _afterTokenTransfer(address(0), to, amount);
 
         // Unlocker callback if `to` is locked.
         if (toLocked) {
             IERC20Unlocker unlocker = unlockerOf(to);
             unlocker.lockedUserReceiveCallback(to, amount);
         }
+
+        // After token transfer hook
+        // Must be called after the unlocker callback to prevent reentrancy
+        _afterTokenTransfer(address(0), to, amount);
     }
 
     /// @dev Uses upper 24 bits of balance slot for referrer. Updates referrer scores.
@@ -552,13 +561,16 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
             mstore(0x20, amount)
             log3(0x20, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, to)
         }
-        _afterTokenTransfer(address(0), to, amount);
 
         // Unlocker callback if `to` is locked.
         if (toLocked) {
             IERC20Unlocker unlocker = unlockerOf(to);
             unlocker.lockedUserReceiveCallback(to, amount);
         }
+
+        // After token transfer hook
+        // Must be called after the unlocker callback to prevent reentrancy
+        _afterTokenTransfer(address(0), to, amount);
     }
 
     /// @dev Burns `amount` tokens from `from`, reducing the total supply.
@@ -673,13 +685,16 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
             mstore(0x20, amount)
             log3(0x20, 0x20, _TRANSFER_EVENT_SIGNATURE, from, to)
         }
-        _afterTokenTransfer(from, to, amount);
 
         // Unlocker callback if `to` is locked.
         if (toLocked) {
             IERC20Unlocker unlocker = unlockerOf(to);
             unlocker.lockedUserReceiveCallback(to, amount);
         }
+
+        // After token transfer hook
+        // Must be called after the unlocker callback to prevent reentrancy
+        _afterTokenTransfer(from, to, amount);
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount, address newReferrer) internal virtual {}
