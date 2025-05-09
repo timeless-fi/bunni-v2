@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {console2} from "forge-std/console2.sol";
 
 import "./LiquidityDensityFunctionTest.sol";
+import {LDFType} from "../../src/types/LDFType.sol";
 import "../../src/ldf/CarpetedGeometricDistribution.sol";
 import "../../src/ldf/LibCarpetedGeometricDistribution.sol";
 
@@ -45,7 +46,7 @@ contract CarpetedGeometricDistributionTest is LiquidityDensityFunctionTest {
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams =
             bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha), uint32(weightCarpet)));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
         _test_liquidityDensity_sumUpToOne(tickSpacing, ldfParams);
     }
 
@@ -76,7 +77,7 @@ contract CarpetedGeometricDistributionTest is LiquidityDensityFunctionTest {
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams =
             bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha), uint32(weightCarpet)));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
         _test_query_cumulativeAmounts(currentTick, tickSpacing, ldfParams);
     }
 
@@ -104,7 +105,7 @@ contract CarpetedGeometricDistributionTest is LiquidityDensityFunctionTest {
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams =
             bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha), uint32(weightCarpet)));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 maxCumulativeAmount0 = LibCarpetedGeometricDistribution.cumulativeAmount0(
             minUsableTick, liquidity, tickSpacing, minTick, length, alphaX96, weightCarpet
@@ -164,7 +165,7 @@ contract CarpetedGeometricDistributionTest is LiquidityDensityFunctionTest {
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams =
             bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha), uint32(weightCarpet)));
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 maxCumulativeAmount1 = LibCarpetedGeometricDistribution.cumulativeAmount1(
             maxUsableTick, liquidity, tickSpacing, minTick, length, alphaX96, weightCarpet
@@ -212,17 +213,17 @@ contract CarpetedGeometricDistributionTest is LiquidityDensityFunctionTest {
         // invalid when minTick < minUsableTick
         (int24 minTick, int24 length) = (minUsableTick - tickSpacing, 2);
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), alpha, weightCarpet));
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // invalid when maxTick > maxUsableTick
         (minTick, length) = (maxUsableTick - tickSpacing, 2);
         ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), alpha, weightCarpet));
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // valid test
         (minTick, length) = (0, 2);
         ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), alpha, weightCarpet));
-        assertTrue(ldf.isValidParams(key, 0, ldfParams));
+        assertTrue(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
     }
 
     function test_boundary_dynamic_boundedWhenDecoding(int24 tickSpacing) external view {
@@ -238,7 +239,7 @@ contract CarpetedGeometricDistributionTest is LiquidityDensityFunctionTest {
         // bounded when minTick < minUsableTick
         (int24 offset, int24 length) = (minUsableTick - tickSpacing, 2);
         bytes32 ldfParams = bytes32(abi.encodePacked(shiftMode, offset, int16(length), alpha, weightCarpet));
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 0");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 0");
         (int24 minTick,,,, ShiftMode decodedShiftMode) =
             LibCarpetedGeometricDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(minTick, minUsableTick, "minTick incorrect");
@@ -247,7 +248,7 @@ contract CarpetedGeometricDistributionTest is LiquidityDensityFunctionTest {
         // bounded when maxTick > maxUsableTick
         (offset, length) = (maxUsableTick - tickSpacing, 2);
         ldfParams = bytes32(abi.encodePacked(shiftMode, offset, int16(length), alpha, weightCarpet));
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 1");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 1");
         (minTick,,,, decodedShiftMode) = LibCarpetedGeometricDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(minTick + length * tickSpacing, maxUsableTick, "maxTick incorrect");
         assertTrue(shiftMode == decodedShiftMode, "shiftMode incorrect");

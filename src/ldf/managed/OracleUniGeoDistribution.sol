@@ -14,6 +14,7 @@ import {IOracle} from "./IOracle.sol";
 import {ShiftMode} from "../ShiftMode.sol";
 import {WAD} from "../../base/Constants.sol";
 import {Guarded} from "../../base/Guarded.sol";
+import {LDFType} from "../../types/LDFType.sol";
 import {roundTickSingle} from "../../lib/Math.sol";
 import {LibOracleUniGeoDistribution} from "./LibOracleUniGeoDistribution.sol";
 import {ILiquidityDensityFunction} from "../../interfaces/ILiquidityDensityFunction.sol";
@@ -263,7 +264,7 @@ contract OracleUniGeoDistribution is ILiquidityDensityFunction, Guarded, Ownable
     }
 
     /// @inheritdoc ILiquidityDensityFunction
-    function isValidParams(PoolKey calldata key, uint24, /* twapSecondsAgo */ bytes32 ldfParams)
+    function isValidParams(PoolKey calldata key, uint24, /* twapSecondsAgo */ bytes32 ldfParams, LDFType ldfType)
         public
         view
         override
@@ -273,7 +274,7 @@ contract OracleUniGeoDistribution is ILiquidityDensityFunction, Guarded, Ownable
         (Currency currency0, Currency currency1) = bond < stablecoin ? (bond, stablecoin) : (stablecoin, bond);
 
         return LibOracleUniGeoDistribution.isValidParams(
-            key.tickSpacing, ldfParams, floorPriceToRick(oracle.getFloorPrice(), key.tickSpacing)
+            key.tickSpacing, ldfParams, floorPriceToRick(oracle.getFloorPrice(), key.tickSpacing), ldfType
         ) && key.currency0 == currency0 && key.currency1 == currency1;
     }
 
@@ -301,7 +302,7 @@ contract OracleUniGeoDistribution is ILiquidityDensityFunction, Guarded, Ownable
     /// @param ldfParams The ldf params
     function setLdfParams(PoolKey calldata key, bytes32 ldfParams) public onlyOwner {
         // ensure new params are valid
-        bool isValid = isValidParams(key, 0, ldfParams);
+        bool isValid = isValidParams(key, 0, ldfParams, LDFType.DYNAMIC_AND_STATEFUL);
         if (!isValid) {
             revert InvalidLdfParams();
         }

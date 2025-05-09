@@ -539,7 +539,7 @@ contract BunniHookTest is BaseTest {
         {
             PoolKey memory key_;
             key_.tickSpacing = TICK_SPACING;
-            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams));
+            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams, LDFType.DYNAMIC_AND_STATEFUL));
         }
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(
             Currency.wrap(address(token0)),
@@ -638,7 +638,7 @@ contract BunniHookTest is BaseTest {
         {
             PoolKey memory key_;
             key_.tickSpacing = TICK_SPACING;
-            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams));
+            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams, LDFType.DYNAMIC_AND_STATEFUL));
         }
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(
             Currency.wrap(address(token0)),
@@ -742,7 +742,7 @@ contract BunniHookTest is BaseTest {
         {
             PoolKey memory key_;
             key_.tickSpacing = TICK_SPACING;
-            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams));
+            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams, LDFType.DYNAMIC_AND_STATEFUL));
         }
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(
             Currency.wrap(address(token0)),
@@ -896,7 +896,7 @@ contract BunniHookTest is BaseTest {
         {
             PoolKey memory key_;
             key_.tickSpacing = TICK_SPACING;
-            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams));
+            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams, LDFType.DYNAMIC_AND_STATEFUL));
         }
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(
             Currency.wrap(address(token0)),
@@ -975,7 +975,7 @@ contract BunniHookTest is BaseTest {
         {
             PoolKey memory key_;
             key_.tickSpacing = TICK_SPACING;
-            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams));
+            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams, LDFType.DYNAMIC_AND_STATEFUL));
         }
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(
             Currency.wrap(address(token0)),
@@ -1053,7 +1053,7 @@ contract BunniHookTest is BaseTest {
         {
             PoolKey memory key_;
             key_.tickSpacing = TICK_SPACING;
-            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams));
+            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams, LDFType.DYNAMIC_AND_STATEFUL));
         }
         ldf_.setMinTick(-30); // minTick of MockLDFs need initialization
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(
@@ -1220,7 +1220,7 @@ contract BunniHookTest is BaseTest {
         {
             PoolKey memory key_;
             key_.tickSpacing = TICK_SPACING;
-            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams));
+            vm.assume(ldf_.isValidParams(key_, TWAP_SECONDS_AGO, ldfParams, LDFType.DYNAMIC_AND_STATEFUL));
         }
         ldf_.setMinTick(-30); // minTick of MockLDFs need initialization
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(

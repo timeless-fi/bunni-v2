@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {console2} from "forge-std/console2.sol";
 
 import "./LiquidityDensityFunctionTest.sol";
+import {LDFType} from "../../src/types/LDFType.sol";
 import "../../src/ldf/CarpetedDoubleGeometricDistribution.sol";
 import "../../src/ldf/LibCarpetedDoubleGeometricDistribution.sol";
 
@@ -72,7 +73,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 uint32(weightCarpet)
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
         _test_liquidityDensity_sumUpToOne(tickSpacing, ldfParams);
     }
 
@@ -131,7 +132,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 uint32(weightCarpet)
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         currentTick = int24(bound(currentTick, minUsableTick, maxUsableTick));
         _test_query_cumulativeAmounts(currentTick, tickSpacing, ldfParams);
@@ -185,7 +186,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 uint32(weightCarpet)
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         LibCarpetedDoubleGeometricDistribution.Params memory params =
             LibCarpetedDoubleGeometricDistribution.decodeParams(minTick, tickSpacing, ldfParams);
@@ -272,7 +273,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 uint32(weightCarpet)
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         LibCarpetedDoubleGeometricDistribution.Params memory params =
             LibCarpetedDoubleGeometricDistribution.decodeParams(minTick, tickSpacing, ldfParams);
@@ -338,7 +339,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 weightCarpet
             )
         );
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // invalid when maxTick > maxUsableTick
         (minTick, length0, length1) = (maxUsableTick - tickSpacing, 1, 1);
@@ -355,7 +356,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 weightCarpet
             )
         );
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // valid test
         (minTick, length0, length1) = (0, 1, 1);
@@ -372,7 +373,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 weightCarpet
             )
         );
-        assertTrue(ldf.isValidParams(key, 0, ldfParams));
+        assertTrue(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
     }
 
     function test_boundary_dynamic_boundedWhenDecoding(int24 tickSpacing) external view {
@@ -403,7 +404,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 weightCarpet
             )
         );
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 0");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 0");
         LibCarpetedDoubleGeometricDistribution.Params memory params =
             LibCarpetedDoubleGeometricDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(params.minTick, minUsableTick, "minTick incorrect");
@@ -424,7 +425,7 @@ contract CarpetedDoubleGeometricDistributionTest is LiquidityDensityFunctionTest
                 weightCarpet
             )
         );
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 1");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 1");
         params = LibCarpetedDoubleGeometricDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(params.minTick + (length0 + length1) * tickSpacing, maxUsableTick, "maxTick incorrect");
         assertTrue(params.shiftMode == shiftMode, "shiftMode incorrect");

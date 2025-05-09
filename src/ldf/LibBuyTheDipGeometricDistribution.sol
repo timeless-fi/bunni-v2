@@ -8,6 +8,7 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import "../lib/Math.sol";
 import "../base/Constants.sol";
 import "./LibGeometricDistribution.sol";
+import {LDFType} from "../types/LDFType.sol";
 
 library LibBuyTheDipGeometricDistribution {
     using FixedPointMathLib for uint256;
@@ -537,7 +538,11 @@ library LibBuyTheDipGeometricDistribution {
         }
     }
 
-    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams) internal pure returns (bool) {
+    function isValidParams(int24 tickSpacing, uint24 twapSecondsAgo, bytes32 ldfParams, LDFType ldfType)
+        internal
+        pure
+        returns (bool)
+    {
         // decode params
         // | shiftMode - 1 byte | minTick - 3 bytes | length - 2 bytes | alpha - 4 bytes | altAlpha - 4 bytes | altThreshold - 3 bytes | altThresholdDirection - 1 byte |
         uint8 shiftMode = uint8(bytes1(ldfParams));
@@ -552,13 +557,14 @@ library LibBuyTheDipGeometricDistribution {
         // validity conditions:
         // - need TWAP to be enabled to trigger the alt alpha switch
         // - shiftMode is static
+        // - ldfType is DYNAMIC_AND_STATEFUL
         // - both LDFs are valid
         // - threshold makes sense i.e. both LDFs can be used at some point
         // - alpha and altAlpha are on different sides of 1
         return (twapSecondsAgo != 0) && (shiftMode == uint8(ShiftMode.STATIC))
-            && geometricIsValidParams(tickSpacing, ldfParams) && geometricIsValidParams(tickSpacing, altLdfParams)
-            && altThreshold < minTick + length * tickSpacing && altThreshold > minTick
-            && ((alpha < ALPHA_BASE) != (altAlpha < ALPHA_BASE));
+            && ldfType == LDFType.DYNAMIC_AND_STATEFUL && geometricIsValidParams(tickSpacing, ldfParams)
+            && geometricIsValidParams(tickSpacing, altLdfParams) && altThreshold < minTick + length * tickSpacing
+            && altThreshold > minTick && ((alpha < ALPHA_BASE) != (altAlpha < ALPHA_BASE));
     }
 
     /// @dev Should be the same as LibGeometricDistribution.isValidParams but without checks for minimum liquidity.

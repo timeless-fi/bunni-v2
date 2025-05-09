@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {console2} from "forge-std/console2.sol";
 
 import "./LiquidityDensityFunctionTest.sol";
+import {LDFType} from "../../src/types/LDFType.sol";
 import "../../src/ldf/DoubleGeometricDistribution.sol";
 
 contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
@@ -66,7 +67,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 weight1
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
         _test_liquidityDensity_sumUpToOne(tickSpacing, ldfParams);
     }
 
@@ -121,7 +122,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 weight1
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         currentTick = int24(bound(currentTick, minUsableTick, maxUsableTick));
         _test_query_cumulativeAmounts(currentTick, tickSpacing, ldfParams);
@@ -171,7 +172,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 weight1
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 alpha0X96 = (alpha0 << 96) / 1e8;
         uint256 alpha1X96 = (alpha1 << 96) / 1e8;
@@ -264,7 +265,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 weight1
             )
         );
-        vm.assume(ldf.isValidParams(key, 0, ldfParams));
+        vm.assume(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 alpha0X96 = (alpha0 << 96) / 1e8;
         uint256 alpha1X96 = (alpha1 << 96) / 1e8;
@@ -338,7 +339,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 weight1
             )
         );
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // invalid when maxTick > maxUsableTick
         (minTick, length0, length1) = (maxUsableTick - tickSpacing, 1, 1);
@@ -354,7 +355,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 weight1
             )
         );
-        assertFalse(ldf.isValidParams(key, 0, ldfParams));
+        assertFalse(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         // valid test
         (minTick, length0, length1) = (0, 1, 1);
@@ -370,7 +371,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 weight1
             )
         );
-        assertTrue(ldf.isValidParams(key, 0, ldfParams));
+        assertTrue(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
     }
 
     function test_boundary_dynamic_boundedWhenDecoding(int24 tickSpacing) external view {
@@ -392,7 +393,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 shiftMode, offset, int16(length0), uint32(alpha0), weight0, int16(length1), uint32(alpha1), weight1
             )
         );
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 0");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 0");
         (int24 minTick,,,,,,, ShiftMode decodedShiftMode) =
             LibDoubleGeometricDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(minTick, minUsableTick, "minTick incorrect");
@@ -405,7 +406,7 @@ contract DoubleGeometricDistributionTest is LiquidityDensityFunctionTest {
                 shiftMode, offset, int16(length0), uint32(alpha0), weight0, int16(length1), uint32(alpha1), weight1
             )
         );
-        assertTrue(ldf.isValidParams(key, 1, ldfParams), "invalid params 1");
+        assertTrue(ldf.isValidParams(key, 1, ldfParams, LDFType.DYNAMIC_AND_STATEFUL), "invalid params 1");
         (minTick,,,,,,, decodedShiftMode) = LibDoubleGeometricDistribution.decodeParams(0, tickSpacing, ldfParams);
         assertEq(minTick + (length0 + length1) * tickSpacing, maxUsableTick, "maxTick incorrect");
         assertTrue(shiftMode == decodedShiftMode, "shiftMode incorrect");

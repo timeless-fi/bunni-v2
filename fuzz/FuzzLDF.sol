@@ -42,7 +42,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        if (!LibUniformDistribution.isValidParams(tickSpacing, 0, ldfParams)) {
+        if (!LibUniformDistribution.isValidParams(tickSpacing, 0, ldfParams, LDFType.STATIC)) {
             return;
         }
 
@@ -93,7 +93,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, tickLower, tickUpper));
-        if (!LibUniformDistribution.isValidParams(tickSpacing, 0, ldfParams)) {
+        if (!LibUniformDistribution.isValidParams(tickSpacing, 0, ldfParams, LDFType.STATIC)) {
             return;
         }
 
@@ -149,7 +149,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
         key.tickSpacing = tickSpacing;
 
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha)));
-        if (!LibGeometricDistribution.isValidParams(tickSpacing, 0, ldfParams)) {
+        if (!LibGeometricDistribution.isValidParams(tickSpacing, 0, ldfParams, LDFType.STATIC)) {
             return;
         }
 
@@ -203,7 +203,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams = bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha)));
-        if (!LibGeometricDistribution.isValidParams(key.tickSpacing, 0, ldfParams)) return;
+        if (!LibGeometricDistribution.isValidParams(key.tickSpacing, 0, ldfParams, LDFType.STATIC)) return;
 
         uint256 maxCumulativeAmount1 = LibGeometricDistribution.cumulativeAmount1(
             maxUsableTick, totalLiquidity, tickSpacing, minTick, length, alphaX96
@@ -281,7 +281,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
                 weight1
             )
         );
-        require(LibDoubleGeometricDistribution.isValidParams(key.tickSpacing, 0, ldfParams));
+        require(LibDoubleGeometricDistribution.isValidParams(key.tickSpacing, 0, ldfParams, LDFType.STATIC));
 
         uint256 alpha0X96 = (alpha0 << 96) / 1e8;
         uint256 alpha1X96 = (alpha1 << 96) / 1e8;
@@ -371,7 +371,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
                 weight1
             )
         );
-        require(LibDoubleGeometricDistribution.isValidParams(key.tickSpacing, 0, ldfParams));
+        require(LibDoubleGeometricDistribution.isValidParams(key.tickSpacing, 0, ldfParams, LDFType.STATIC));
 
         uint256 alpha0X96 = (alpha0 << 96) / 1e8;
         uint256 alpha1X96 = (alpha1 << 96) / 1e8;
@@ -440,7 +440,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams =
             bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha), uint32(weightCarpet)));
-        require(ldf.isValidParams(key, 0, ldfParams));
+        require(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 maxCumulativeAmount0 = LibCarpetedGeometricDistribution.cumulativeAmount0(
             minUsableTick, liquidity, tickSpacing, minTick, length, alphaX96, weightCarpet
@@ -499,7 +499,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
         key.tickSpacing = tickSpacing;
         bytes32 ldfParams =
             bytes32(abi.encodePacked(ShiftMode.STATIC, minTick, int16(length), uint32(alpha), uint32(weightCarpet)));
-        require(ldf.isValidParams(key, 0, ldfParams));
+        require(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         uint256 maxCumulativeAmount1 = LibCarpetedGeometricDistribution.cumulativeAmount1(
             maxUsableTick, liquidity, tickSpacing, minTick, length, alphaX96, weightCarpet
@@ -582,7 +582,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
                 uint32(weightCarpet)
             )
         );
-        require(ldf.isValidParams(key, 0, ldfParams));
+        require(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         LibCarpetedDoubleGeometricDistribution.Params memory params =
             LibCarpetedDoubleGeometricDistribution.decodeParams(minTick, tickSpacing, ldfParams);
@@ -667,7 +667,7 @@ contract FuzzLDF is FuzzHelper, PropertiesAsserts {
                 uint32(weightCarpet)
             )
         );
-        require(ldf.isValidParams(key, 0, ldfParams));
+        require(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC));
 
         LibCarpetedDoubleGeometricDistribution.Params memory params =
             LibCarpetedDoubleGeometricDistribution.decodeParams(minTick, tickSpacing, ldfParams);

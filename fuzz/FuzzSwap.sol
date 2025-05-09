@@ -17,6 +17,7 @@ import {GeometricDistribution} from "../src/ldf/GeometricDistribution.sol";
 import {DoubleGeometricDistribution} from "../src/ldf/DoubleGeometricDistribution.sol";
 import {CarpetedGeometricDistribution} from "../src/ldf/CarpetedGeometricDistribution.sol";
 import {CarpetedDoubleGeometricDistribution} from "../src/ldf/CarpetedDoubleGeometricDistribution.sol";
+import {LDFType} from "../src/types/LDFType.sol";
 
 import "./FuzzHelper.sol";
 import "../src/lib/BunniSwapMath.sol";
@@ -936,7 +937,7 @@ contract FuzzSwap is FuzzHelper, PropertiesAsserts {
         PoolKey memory key;
         key.tickSpacing = tickSpacing;
 
-        require(ldf.isValidParams(key, 0, ldfParams), "invalid LDF params");
+        require(ldf.isValidParams(key, 0, ldfParams, LDFType.STATIC), "invalid LDF params");
 
         // set up BunniComputeSwapInput
         input.key = key;
