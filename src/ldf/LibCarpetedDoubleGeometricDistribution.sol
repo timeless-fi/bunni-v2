@@ -15,8 +15,6 @@ library LibCarpetedDoubleGeometricDistribution {
     using SafeCastLib for uint256;
     using FixedPointMathLib for uint256;
 
-    uint256 internal constant ALPHA_BASE = 1e8; // alpha uses 8 decimals in ldfParams
-    uint256 internal constant MIN_LIQUIDITY_DENSITY = Q96 / 1e3;
     uint256 internal constant SCALED_Q96 = 0x10000000000000000000000000; // Q96 << QUERY_SCALE_SHIFT
     uint8 internal constant QUERY_SCALE_SHIFT = 4;
 
