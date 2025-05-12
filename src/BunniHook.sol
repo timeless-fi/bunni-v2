@@ -221,6 +221,12 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         // burn and take
         poolManager.burn(address(this), currency.toId(), amount);
         poolManager.take(currency, address(this), amount);
+
+        // approve input token to permit2
+        ERC20 token = currency.isAddressZero() ? weth : ERC20(Currency.unwrap(currency));
+        if (token.allowance(address(this), permit2) < amount) {
+            address(token).safeApproveWithRetry(permit2, amount);
+        }
     }
 
     /// @dev Settles tokens sent to PoolManager and mints the corresponding claim tokens.
