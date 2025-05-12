@@ -27,6 +27,8 @@ using FixedPointMathLib for uint256;
 /// @param ldfState The current state of the liquidity density function
 /// @param balance0 The balance of token0 in the pool
 /// @param balance1 The balance of token1 in the pool
+/// @param idleBalance The idle balance of the pool, which is removed from the corresponding balance0/balance1
+/// when computing totalLiquidity.
 /// @return totalLiquidity The total liquidity in the pool
 /// @return totalDensity0X96 The total density of token0 in the pool, scaled by Q96
 /// @return totalDensity1X96 The total density of token1 in the pool, scaled by Q96
