@@ -58,6 +58,7 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
     event SetHookFeeRecipient(address hookFeeRecipient);
     event SetModifiers(uint32 indexed hookFeeModifier, uint32 indexed referrerRewardModifier);
     event SetWithdrawalUnblocked(PoolId indexed id, bool unblocked);
+    event ScheduleKChange(uint48 currentK, uint48 indexed newK, uint160 indexed activeBlock);
     event ClaimProtocolFees(Currency[] currencyList, address indexed recipient);
 
     /// -----------------------------------------------------------------------
@@ -229,6 +230,12 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
     /// @param id The pool id
     /// @param unblocked Whether withdrawals are unblocked for the given pool when a rebalance order is active
     function setWithdrawalUnblocked(PoolId id, bool unblocked) external;
+
+    /// @notice Schedules a change in the K constant used in am-AMM. Only callable by the owner.
+    /// @dev The new K should be greater than the current K. This corresponds to a decrease in block time.
+    /// @param newK The new K constant
+    /// @param activeBlock The block number at which the new K should take effect
+    function scheduleKChange(uint48 newK, uint160 activeBlock) external;
 
     /// -----------------------------------------------------------------------
     /// Rebalance functions

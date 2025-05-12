@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.4;
 
+import {Ownable} from "solady/auth/Ownable.sol";
+
 import "./BaseTest.sol";
 
 contract BunniHookTest is BaseTest {
@@ -1674,6 +1676,28 @@ contract BunniHookTest is BaseTest {
         (uint256 balanceAfter, bool isToken0After) = idleBalanceAfter.fromIdleBalance();
         assertLt(balanceAfter, balanceBefore, "idle balance should be reduced");
         assertFalse(isToken0After, "idle balance should still be in token1");
+    }
+
+    function test_scheduleKChange_revertWhenNewKIsNotGreaterThanCurrentK() public {
+        vm.expectRevert(BunniHook__InvalidK.selector);
+        bunniHook.scheduleKChange(100, uint160(block.number));
+    }
+
+    function test_scheduleKChange_revertWhenActiveBlockIsInPast() public {
+        vm.expectRevert(BunniHook__InvalidActiveBlock.selector);
+        bunniHook.scheduleKChange(10000, uint160(block.number - 1));
+    }
+
+    function test_scheduleKChange_succeedsWhenNewKIsGreaterThanCurrentK() public {
+        vm.expectEmit(true, true, true, true);
+        emit IBunniHook.ScheduleKChange(K, 10000, uint160(block.number));
+        bunniHook.scheduleKChange(10000, uint160(block.number));
+    }
+
+    function test_scheduleKChange_onlyOwner() public {
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vm.prank(address(0x1234));
+        bunniHook.scheduleKChange(10000, uint160(block.number));
     }
 
     // Implementation of IFulfiller interface
