@@ -73,7 +73,7 @@ function queryLDF(
     ) = ldf.query(key, roundedTick, arithmeticMeanTick, tick, ldfParams, ldfState);
 
     (uint256 density0OfRoundedTickX96, uint256 density1OfRoundedTickX96) = LiquidityAmounts.getAmountsForLiquidity(
-        sqrtPriceX96, roundedTickSqrtRatio, nextRoundedTickSqrtRatio, uint128(liquidityDensityOfRoundedTickX96), true
+        sqrtPriceX96, roundedTickSqrtRatio, nextRoundedTickSqrtRatio, liquidityDensityOfRoundedTickX96, true
     );
     totalDensity0X96 = density0RightOfRoundedTickX96 + density0OfRoundedTickX96;
     totalDensity1X96 = density1LeftOfRoundedTickX96 + density1OfRoundedTickX96;
