@@ -608,7 +608,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         return minRent > type(uint128).max ? type(uint128).max : uint128(minRent);
     }
 
-    /// @dev precedence is poolOverride > globalOverride > poolEnabled
     function _amAmmEnabled(PoolId id) internal view virtual override returns (bool) {
         bytes memory hookParams = hub.hookParams(id);
         bytes32 firstWord;
