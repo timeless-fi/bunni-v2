@@ -32,6 +32,7 @@ import {Ownable} from "./base/Ownable.sol";
 import {BaseHook} from "./base/BaseHook.sol";
 import {IBunniHub} from "./interfaces/IBunniHub.sol";
 import {BunniSwapMath} from "./lib/BunniSwapMath.sol";
+import {BlockNumberLib} from "./lib/BlockNumberLib.sol";
 import {BunniHookLogic} from "./lib/BunniHookLogic.sol";
 import {ReentrancyGuard} from "./base/ReentrancyGuard.sol";
 
@@ -85,9 +86,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// @notice Used for computing the referral reward amount. Reward is `hookFee * referralRewardModifier / 1e6`.
     uint32 internal referralRewardModifier;
 
-    /// @notice The K constant used in am-AMM.
-    uint48 internal _K;
-
     /// @notice The FloodZone contract used in rebalance orders.
     IZone internal floodZone;
 
@@ -95,6 +93,16 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// will continue to be blocked until the rebalance order is fulfilled since there is order resubmission. This allows
     /// the hook owner to manually unblock withdrawals for a pool.
     mapping(PoolId => bool) internal withdrawalUnblocked;
+
+    /// @notice The K constant used in am-AMM.
+    uint48 internal _K;
+
+    /// @notice The pending K constant used in am-AMM. Used when scheduling a K change.
+    uint48 internal _pendingK;
+
+    /// @notice The block number at which the pending K change will take effect.
+    /// @dev Don't have to worry about overflow since it would take 4.63e34 years to occur (at 0.001ms block time)
+    uint160 internal _pendingKActiveBlock;
 
     /// -----------------------------------------------------------------------
     /// Constructor
@@ -323,10 +331,29 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     }
 
     /// @inheritdoc IBunniHook
-    function setK(uint48 newK) external onlyOwner {
-        if (newK <= _K) revert BunniHook__InvalidK();
-        _K = newK;
-        emit SetK(newK);
+    function scheduleKChange(uint48 newK, uint160 activeBlock) external onlyOwner {
+        // load storage vars from single slot
+        uint48 k = _K;
+        uint48 pendingK = _pendingK;
+        uint160 pendingKActiveBlock = _pendingKActiveBlock;
+
+        // validate input
+        if (newK <= k) revert BunniHook__InvalidK();
+        uint256 blockNumber = BlockNumberLib.getBlockNumber();
+        if (activeBlock < blockNumber) revert BunniHook__InvalidActiveBlock();
+
+        // determine current K
+        uint48 currentK = pendingK > k && blockNumber >= pendingKActiveBlock ? pendingK : k;
+
+        if (currentK == k) {
+            _pendingK = newK;
+            _pendingKActiveBlock = activeBlock;
+        } else {
+            _K = currentK;
+            _pendingK = newK;
+            _pendingKActiveBlock = activeBlock;
+        }
+        emit ScheduleKChange(currentK, newK, activeBlock);
     }
 
     /// -----------------------------------------------------------------------
@@ -599,7 +626,13 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// -----------------------------------------------------------------------
 
     function K(PoolId) internal view virtual override returns (uint48) {
-        return _K;
+        // load storage vars from single slot
+        uint48 k = _K;
+        uint48 pendingK = _pendingK;
+        uint160 pendingKActiveBlock = _pendingKActiveBlock;
+
+        // determine K value to use
+        return pendingK > k && block.number >= pendingKActiveBlock ? pendingK : k;
     }
 
     function MIN_RENT(PoolId id) internal view virtual override returns (uint128) {

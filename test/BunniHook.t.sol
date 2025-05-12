@@ -1678,21 +1678,26 @@ contract BunniHookTest is BaseTest {
         assertFalse(isToken0After, "idle balance should still be in token1");
     }
 
-    function test_setK_revertWhenNewKIsNotGreaterThanCurrentK() public {
+    function test_scheduleKChange_revertWhenNewKIsNotGreaterThanCurrentK() public {
         vm.expectRevert(BunniHook__InvalidK.selector);
-        bunniHook.setK(100);
+        bunniHook.scheduleKChange(100, uint160(block.number));
     }
 
-    function test_setK_succeedsWhenNewKIsGreaterThanCurrentK() public {
+    function test_scheduleKChange_revertWhenActiveBlockIsInPast() public {
+        vm.expectRevert(BunniHook__InvalidActiveBlock.selector);
+        bunniHook.scheduleKChange(10000, uint160(block.number - 1));
+    }
+
+    function test_scheduleKChange_succeedsWhenNewKIsGreaterThanCurrentK() public {
         vm.expectEmit(true, true, true, true);
-        emit IBunniHook.SetK(10000);
-        bunniHook.setK(10000);
+        emit IBunniHook.ScheduleKChange(K, 10000, uint160(block.number));
+        bunniHook.scheduleKChange(10000, uint160(block.number));
     }
 
-    function test_setK_onlyOwner() public {
+    function test_scheduleKChange_onlyOwner() public {
         vm.expectRevert(Ownable.Unauthorized.selector);
         vm.prank(address(0x1234));
-        bunniHook.setK(10000);
+        bunniHook.scheduleKChange(10000, uint160(block.number));
     }
 
     // Implementation of IFulfiller interface
