@@ -15,15 +15,15 @@ import {IERC20Referrer} from "../interfaces/IERC20Referrer.sol";
 /// the score of each referrer, which is the sum of all balances of accounts that
 /// have the referrer as their referrer. Supports locking accounts which enables
 /// transfer-less staking contracts that don't disrupt the referrer tracking.
-/// @dev Balances are stored as uint232 instead of uint256 since the upper 24 bits
-/// of the storage slot are used to store the lock flag & referrer.
+/// @dev The most significant bit of the balance storage slot is used to store the locked flag.
+/// Thus balances can only go up to 2^255 - 1.
 /// Referrer 0 should be reserved for the protocol since it's the default referrer.
 abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
     /// -----------------------------------------------------------------------
     /// Errors
     /// -----------------------------------------------------------------------
 
-    /// @dev Error when the balance overflows uint232.
+    /// @dev Error when the balance overflows 255 bits.
     error BalanceOverflow();
 
     /// -----------------------------------------------------------------------
@@ -244,7 +244,7 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
     }
 
     /// @inheritdoc ERC20
-    /// @dev Uses upper 24 bits of balance slot for referrer. Updates referrer scores.
+    /// @dev Uses most significant bit of balance slot for lock flag. Updates referrer scores.
     function transfer(address to, uint256 amount) public virtual override returns (bool) {
         address msgSender = LibMulticaller.senderOrSigner();
         bool toLocked;
@@ -322,7 +322,7 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
     }
 
     /// @inheritdoc ERC20
-    /// @dev Uses upper 24 bits of balance slot for referrer. Updates referrer scores.
+    /// @dev Uses most significant bit of balance slot for lock flag. Updates referrer scores.
     function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
         address msgSender = LibMulticaller.senderOrSigner();
         bool toLocked;
@@ -417,7 +417,7 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
     }
 
     /// @inheritdoc ERC20
-    /// @dev Uses upper 24 bits of balance slot for referrer. Updates referrer scores.
+    /// @dev Uses most significant bit of balance slot for lock flag. Updates referrer scores.
     /// Uses the existing referrer of the `to` address.
     function _mint(address to, uint256 amount) internal virtual override {
         bool toLocked;
@@ -474,8 +474,8 @@ abstract contract ERC20Referrer is ERC20, IERC20Referrer, IERC20Lockable {
         }
     }
 
-    /// @dev Uses upper 24 bits of balance slot for referrer. Updates referrer scores.
-    /// Updates the referrer of `to` to `referrer`.
+    /// @dev Uses most significant bit of balance slot for lock flag. Updates referrer scores.
+    /// Updates the referrer of `to` to `referrer` if it's currently address(0).
     function _mint(address to, uint256 amount, address referrer) internal virtual {
         bool toLocked;
 
