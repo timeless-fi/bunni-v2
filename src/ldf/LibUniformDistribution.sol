@@ -474,13 +474,11 @@ library LibUniformDistribution {
             (int24 minUsableTick, int24 maxUsableTick) =
                 (TickMath.minUsableTick(tickSpacing), TickMath.maxUsableTick(tickSpacing));
             if (tickLower < minUsableTick) {
-                int24 tickLength = tickUpper - tickLower;
                 tickLower = minUsableTick;
-                tickUpper = int24(FixedPointMathLib.min(tickLower + tickLength, maxUsableTick));
+                tickUpper = int24(FixedPointMathLib.min(tickLower + length * tickSpacing, maxUsableTick));
             } else if (tickUpper > maxUsableTick) {
-                int24 tickLength = tickUpper - tickLower;
                 tickUpper = maxUsableTick;
-                tickLower = int24(FixedPointMathLib.max(tickUpper - tickLength, minUsableTick));
+                tickLower = int24(FixedPointMathLib.max(tickUpper - length * tickSpacing, minUsableTick));
             }
         } else {
             // | shiftMode - 1 byte | tickLower - 3 bytes | tickUpper - 3 bytes |
