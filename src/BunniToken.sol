@@ -360,7 +360,8 @@ contract BunniToken is IBunniToken, ERC20Referrer, Clone, Ownable {
         // messing up the accounting
         IHooklet hooklet_ = hooklet();
         if (hooklet_.hasPermission(HookletLib.BEFORE_TRANSFER_FLAG)) {
-            hooklet_.hookletBeforeTransfer(msg.sender, poolKey(), this, from, to, amount);
+            address msgSender = LibMulticaller.senderOrSigner();
+            hooklet_.hookletBeforeTransfer(msgSender, poolKey(), this, from, to, amount);
         }
     }
 
@@ -368,7 +369,8 @@ contract BunniToken is IBunniToken, ERC20Referrer, Clone, Ownable {
         // call hooklet
         IHooklet hooklet_ = hooklet();
         if (hooklet_.hasPermission(HookletLib.AFTER_TRANSFER_FLAG)) {
-            hooklet_.hookletAfterTransfer(msg.sender, poolKey(), this, from, to, amount);
+            address msgSender = LibMulticaller.senderOrSigner();
+            hooklet_.hookletAfterTransfer(msgSender, poolKey(), this, from, to, amount);
         }
     }
 
