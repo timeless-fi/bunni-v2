@@ -12,7 +12,6 @@ import "flood-contracts/src/interfaces/IOnChainOrders.sol";
 import {IEIP712} from "permit2/src/interfaces/IEIP712.sol";
 
 import {ERC20} from "solady/tokens/ERC20.sol";
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
 import "./VaultMath.sol";
@@ -27,7 +26,6 @@ import {OrderHashMemory} from "./OrderHashMemory.sol";
 
 library RebalanceLogic {
     using FullMathX96 for *;
-    using SafeTransferLib for *;
     using FixedPointMathLib for *;
     using IdleBalanceLibrary for *;
     using Oracle for Oracle.Observation[MAX_CARDINALITY];
@@ -226,11 +224,6 @@ library RebalanceLogic {
         // record order for verification later
         (s.rebalanceOrderHash[id], s.rebalanceOrderPermit2Hash[id]) = _hashFloodOrder(order, env);
         s.rebalanceOrderDeadline[id] = order.deadline;
-
-        // approve input token to permit2
-        if (inputERC20Token.allowance(address(this), env.permit2) < inputAmount) {
-            address(inputERC20Token).safeApproveWithRetry(env.permit2, type(uint256).max);
-        }
 
         // etch order so fillers can pick it up
         // use PoolId as signature to enable isValidSignature() to find the correct order hash
