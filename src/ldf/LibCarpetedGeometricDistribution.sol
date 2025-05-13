@@ -4,6 +4,8 @@ pragma solidity ^0.8.19;
 import {SafeCastLib} from "solady/utils/SafeCastLib.sol";
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+
 import "./ShiftMode.sol";
 import "../lib/Math.sol";
 import "../lib/ExpMath.sol";
@@ -130,6 +132,10 @@ library LibCarpetedGeometricDistribution {
         uint256 alphaX96,
         uint256 weightCarpet
     ) internal pure returns (bool success, int24 roundedTick) {
+        if (cumulativeAmount0_ == 0) {
+            return (true, TickMath.maxUsableTick(tickSpacing));
+        }
+
         // try LDFs in the order of right carpet, main, left carpet
         (
             uint256 leftCarpetLiquidity,
@@ -138,9 +144,6 @@ library LibCarpetedGeometricDistribution {
             int24 minUsableTick,
             int24 maxUsableTick
         ) = getCarpetedLiquidity(totalLiquidity, tickSpacing, minTick, length, weightCarpet);
-        if (cumulativeAmount0_ == 0) {
-            return (true, maxUsableTick);
-        }
         uint256 rightCarpetCumulativeAmount0 = LibUniformDistribution.cumulativeAmount0(
             minTick + length * tickSpacing,
             rightCarpetLiquidity,
@@ -196,6 +199,10 @@ library LibCarpetedGeometricDistribution {
         uint256 alphaX96,
         uint256 weightCarpet
     ) internal pure returns (bool success, int24 roundedTick) {
+        if (cumulativeAmount1_ == 0) {
+            return (true, TickMath.minUsableTick(tickSpacing) - tickSpacing);
+        }
+
         // try LDFs in the order of left carpet, main, right carpet
         (
             uint256 leftCarpetLiquidity,
@@ -204,9 +211,6 @@ library LibCarpetedGeometricDistribution {
             int24 minUsableTick,
             int24 maxUsableTick
         ) = getCarpetedLiquidity(totalLiquidity, tickSpacing, minTick, length, weightCarpet);
-        if (cumulativeAmount1_ == 0) {
-            return (true, minUsableTick - tickSpacing);
-        }
         uint256 leftCarpetCumulativeAmount1 = LibUniformDistribution.cumulativeAmount1(
             minTick, leftCarpetLiquidity, tickSpacing, minUsableTick, minTick, true
         );

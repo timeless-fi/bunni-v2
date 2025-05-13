@@ -400,7 +400,7 @@ library LibGeometricDistribution {
 
         // ensure that roundedTick is not minTick + length * tickSpacing when cumulativeAmount0_ is non-zero
         // this can happen if the corresponding cumulative density is too small
-        if (roundedTick == maxTick && cumulativeAmount0_ != 0) {
+        if (roundedTick == maxTick) {
             return (true, maxTick - tickSpacing);
         }
     }
@@ -497,7 +497,7 @@ library LibGeometricDistribution {
 
         // ensure that roundedTick is not (minTick - tickSpacing) when cumulativeAmount1_ is non-zero and rounding up
         // this can happen if the corresponding cumulative density is too small
-        if (roundedTick == minTick - tickSpacing && cumulativeAmount1_ != 0) {
+        if (roundedTick == minTick - tickSpacing) {
             return (true, minTick);
         }
     }

@@ -160,7 +160,7 @@ library LibUniformDistribution {
 
         // ensure that roundedTick is not tickUpper when cumulativeAmount0_ is non-zero
         // this can happen if the corresponding cumulative density is too small
-        if (roundedTick == tickUpper && cumulativeAmount0_ != 0) {
+        if (roundedTick == tickUpper) {
             return (true, tickUpper - tickSpacing);
         }
     }
@@ -209,7 +209,7 @@ library LibUniformDistribution {
 
         // ensure that roundedTick is not (tickLower - tickSpacing) when cumulativeAmount1_ is non-zero and rounding up
         // this can happen if the corresponding cumulative density is too small
-        if (roundedTick == tickLower - tickSpacing && cumulativeAmount1_ != 0) {
+        if (roundedTick == tickLower - tickSpacing) {
             return (true, tickLower);
         }
     }
