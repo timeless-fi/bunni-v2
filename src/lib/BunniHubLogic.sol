@@ -87,7 +87,7 @@ library BunniHubLogic {
         /// Validation
         /// -----------------------------------------------------------------------
 
-        if (msg.value != 0 && !params.poolKey.currency0.isAddressZero() && !params.poolKey.currency1.isAddressZero()) {
+        if (msg.value != 0 && !params.poolKey.currency0.isAddressZero()) {
             revert BunniHub__MsgValueNotZeroWhenPoolKeyHasNoNativeToken();
         }
 
@@ -219,12 +219,6 @@ library BunniHubLogic {
             if (address(this).balance != 0) {
                 params.refundRecipient.safeTransferETH(
                     FixedPointMathLib.min(address(this).balance, msg.value - amount0Spent)
-                );
-            }
-        } else if (params.poolKey.currency1.isAddressZero()) {
-            if (address(this).balance != 0) {
-                params.refundRecipient.safeTransferETH(
-                    FixedPointMathLib.min(address(this).balance, msg.value - amount1Spent)
                 );
             }
         }

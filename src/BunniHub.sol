@@ -452,13 +452,9 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
             poolManager.sync(key.currency1);
 
             // transfer tokens to poolManager
-            if (key.currency1.isAddressZero()) {
-                if (msgValue < rawAmount1) revert BunniHub__MsgValueInsufficient();
-                paid1 = poolManager.settle{value: rawAmount1}();
-            } else {
-                Currency.unwrap(key.currency1).excessivelySafeTransferFrom2(msgSender, address(poolManager), rawAmount1);
-                paid1 = poolManager.settle();
-            }
+            // currency1 can't be zero since it's > currency0
+            Currency.unwrap(key.currency1).excessivelySafeTransferFrom2(msgSender, address(poolManager), rawAmount1);
+            paid1 = poolManager.settle();
 
             poolManager.mint(address(this), key.currency1.toId(), paid1);
             s.poolState[poolId].rawBalance1 += paid1;
