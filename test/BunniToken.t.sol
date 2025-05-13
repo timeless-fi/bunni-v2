@@ -640,8 +640,6 @@ contract BunniTokenTest is BaseTest, IUnlockCallback {
         uint256 value;
         if (key_.currency0.isAddressZero()) {
             value = depositAmount0;
-        } else if (key_.currency1.isAddressZero()) {
-            value = depositAmount1;
         }
         _mint(key_.currency0, depositor, depositAmount0);
         _mint(key_.currency1, depositor, depositAmount1);
