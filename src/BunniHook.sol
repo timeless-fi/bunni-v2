@@ -616,8 +616,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         assembly {
             firstWord := mload(add(hookParams, 32))
         }
-        bool poolEnabled = uint8(bytes1(firstWord << 248)) != 0;
-        return poolEnabled;
+        return uint8(bytes1(firstWord << 248)) != 0;
     }
 
     function _payloadIsValid(PoolId id, bytes6 payload) internal view virtual override returns (bool) {
