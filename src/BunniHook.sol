@@ -7,6 +7,7 @@ import "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {TransientStateLibrary} from "@uniswap/v4-core/src/libraries/TransientStateLibrary.sol";
 
 import {AmAmm} from "biddog/AmAmm.sol";
 
@@ -49,6 +50,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     using IdleBalanceLibrary for *;
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
+    using TransientStateLibrary for IPoolManager;
     using Oracle for Oracle.Observation[MAX_CARDINALITY];
 
     /// -----------------------------------------------------------------------
@@ -195,9 +197,13 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         (HookUnlockCallbackType t, bytes memory callbackData) = abi.decode(data, (HookUnlockCallbackType, bytes));
 
         if (t == HookUnlockCallbackType.REBALANCE_PREHOOK) {
-            _rebalancePrehookCallback(callbackData);
+            (Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne) =
+                abi.decode(callbackData, (Currency, uint256, PoolKey, bool));
+            _rebalancePrehookCallback(currency, amount, key, zeroForOne);
         } else if (t == HookUnlockCallbackType.REBALANCE_POSTHOOK) {
-            _rebalancePosthookCallback(callbackData);
+            (Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne) =
+                abi.decode(callbackData, (Currency, uint256, PoolKey, bool));
+            _rebalancePosthookCallback(currency, amount, key, zeroForOne);
         } else if (t == HookUnlockCallbackType.CLAIM_FEES) {
             _claimFees(callbackData);
         }
@@ -207,11 +213,9 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// @dev Calls hub.hookHandleSwap to pull the rebalance swap input tokens from BunniHub.
     /// Then burns PoolManager claim tokens and takes the underlying tokens from PoolManager.
     /// Used while executing rebalance orders.
-    function _rebalancePrehookCallback(bytes memory callbackData) internal {
-        // decode data
-        (Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne) =
-            abi.decode(callbackData, (Currency, uint256, PoolKey, bool));
-
+    function _rebalancePrehookCallback(Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne)
+        internal
+    {
         // pull claim tokens from BunniHub
         hub.hookHandleSwap({key: key, zeroForOne: zeroForOne, inputAmount: 0, outputAmount: amount});
 
@@ -226,11 +230,9 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// @dev Settles tokens sent to PoolManager and mints the corresponding claim tokens.
     /// Then calls hub.hookHandleSwap to update pool balances with rebalance swap output.
     /// Used while executing rebalance orders.
-    function _rebalancePosthookCallback(bytes memory callbackData) internal {
-        // decode data
-        (Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne) =
-            abi.decode(callbackData, (Currency, uint256, PoolKey, bool));
-
+    function _rebalancePosthookCallback(Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne)
+        internal
+    {
         // sync poolManager balance and transfer the output tokens to poolManager
         poolManager.sync(currency);
         if (!currency.isAddressZero()) {
@@ -505,12 +507,16 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         // pull input tokens from BunniHub to BunniHook
         // received in the form of PoolManager claim tokens
         // then unwrap claim tokens
-        poolManager.unlock(
-            abi.encode(
-                HookUnlockCallbackType.REBALANCE_PREHOOK,
-                abi.encode(args.currency, args.amount, hookArgs.key, hookArgs.key.currency1 == args.currency)
-            )
-        );
+        if (poolManager.isUnlocked()) {
+            _rebalancePrehookCallback(args.currency, args.amount, hookArgs.key, hookArgs.key.currency1 == args.currency);
+        } else {
+            poolManager.unlock(
+                abi.encode(
+                    HookUnlockCallbackType.REBALANCE_PREHOOK,
+                    abi.encode(args.currency, args.amount, hookArgs.key, hookArgs.key.currency1 == args.currency)
+                )
+            );
+        }
 
         // ensure we have at least args.amount tokens so that there is enough input for the order
         if (args.currency.balanceOfSelf() < args.amount) {
@@ -574,12 +580,18 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         orderOutputAmount -= outputBalanceBefore;
 
         // posthook should wrap output tokens as claim tokens and push it from BunniHook to BunniHub and update pool balances
-        poolManager.unlock(
-            abi.encode(
-                HookUnlockCallbackType.REBALANCE_POSTHOOK,
-                abi.encode(args.currency, orderOutputAmount, hookArgs.key, hookArgs.key.currency0 == args.currency)
-            )
-        );
+        if (poolManager.isUnlocked()) {
+            _rebalancePosthookCallback(
+                args.currency, orderOutputAmount, hookArgs.key, hookArgs.key.currency0 == args.currency
+            );
+        } else {
+            poolManager.unlock(
+                abi.encode(
+                    HookUnlockCallbackType.REBALANCE_POSTHOOK,
+                    abi.encode(args.currency, orderOutputAmount, hookArgs.key, hookArgs.key.currency0 == args.currency)
+                )
+            );
+        }
 
         // recompute idle balance
         BunniHookLogic.recomputeIdleBalance(s, hub, hookArgs.key);
