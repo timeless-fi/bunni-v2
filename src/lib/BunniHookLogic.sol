@@ -399,6 +399,12 @@ library BunniHookLogic {
                 hookFeesAmount = outputAmount.mulDivUp(hookFeesBaseSwapFee, SWAP_FEE_BASE).mulDivUp(
                     env.hookFeeModifier, MODIFIER_BASE
                 );
+
+                // it's possible that swapFeeAmount + hookFeesAmount > outputAmount
+                // in this case, we just take the entire output amount
+                if (swapFeeAmount + hookFeesAmount > outputAmount) {
+                    hookFeesAmount = outputAmount - swapFeeAmount;
+                }
             } else {
                 hookFeesAmount = swapFeeAmount.mulDivUp(env.hookFeeModifier, MODIFIER_BASE);
                 swapFeeAmount -= hookFeesAmount;
