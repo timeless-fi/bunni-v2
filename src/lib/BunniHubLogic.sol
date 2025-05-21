@@ -214,7 +214,19 @@ library BunniHubLogic {
             }
         }
 
+        // emit event
+        emit IBunniHub.Deposit(msgSender, params.recipient, poolId, amount0, amount1, shares);
+
+        /// -----------------------------------------------------------------------
+        /// Hooklet call
+        /// -----------------------------------------------------------------------
+
+        state.hooklet.hookletAfterDeposit(
+            msgSender, params, IHooklet.DepositReturnData({shares: shares, amount0: amount0, amount1: amount1})
+        );
+
         // refund excess ETH
+        // must be after hooklet call to avoid reentrancy & disrupting hooklet behavior
         if (params.poolKey.currency0.isAddressZero()) {
             if (address(this).balance != 0) {
                 params.refundRecipient.safeTransferETH(
@@ -228,17 +240,6 @@ library BunniHubLogic {
                 );
             }
         }
-
-        // emit event
-        emit IBunniHub.Deposit(msgSender, params.recipient, poolId, amount0, amount1, shares);
-
-        /// -----------------------------------------------------------------------
-        /// Hooklet call
-        /// -----------------------------------------------------------------------
-
-        state.hooklet.hookletAfterDeposit(
-            msgSender, params, IHooklet.DepositReturnData({shares: shares, amount0: amount0, amount1: amount1})
-        );
     }
 
     struct DepositLogicInputData {
