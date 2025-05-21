@@ -350,6 +350,7 @@ contract BunniQuoter is IBunniQuoter {
             shares = WAD - MIN_INITIAL_SHARES;
         } else {
             // given that the position may become single-sided, we need to handle the case where one of the existingAmount values is zero
+            if (existingAmount0 == 0 && existingAmount1 == 0) return (false, 0, 0, 0);
             shares = FixedPointMathLib.min(
                 depositReturnData.balance0 == 0
                     ? type(uint256).max
@@ -376,6 +377,13 @@ contract BunniQuoter is IBunniQuoter {
         PoolId poolId = params.poolKey.toId();
         PoolState memory state = hub.poolState(poolId);
         IBunniHook hook = IBunniHook(address(params.poolKey.hooks));
+
+        if (!params.useQueuedWithdrawal) {
+            IAmAmm.Bid memory topBid = hook.getTopBid(poolId);
+            if (topBid.manager != address(0) && hook.getAmAmmEnabled(poolId)) {
+                return (false, 0, 0);
+            }
+        }
 
         if (!hook.canWithdraw(poolId)) {
             return (false, 0, 0);
