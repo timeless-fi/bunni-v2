@@ -309,6 +309,9 @@ interface IBunniHub is IUnlockCallback, IOwnable {
     /// @notice The BunniToken of a given pool. address(0) if the pool is not a Bunni pool.
     function bunniTokenOfPool(PoolId poolId) external view returns (IBunniToken);
 
+    /// @notice The hooklet of a given pool. address(0) if the pool is not a Bunni pool.
+    function hookletOfPool(PoolId poolId) external view returns (IHooklet);
+
     /// @notice The params of the given Bunni pool's hook. bytes("") if the pool is not a Bunni pool.
     function hookParams(PoolId poolId) external view returns (bytes memory);
 

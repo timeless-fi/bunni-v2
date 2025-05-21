@@ -238,6 +238,8 @@ interface IHooklet {
         returns (bytes4 selector, bool feeOverriden, uint24 fee, bool priceOverridden, uint160 sqrtPriceX96);
 
     /// @notice Called after a swap operation.
+    /// @dev Also called after a rebalance order execution, in which case returnData will only have
+    /// inputAmount and outputAmount filled out.
     /// @param sender The address of the account that initiated the swap.
     /// @param key The Uniswap v4 pool's key.
     /// @param params The swap's input parameters.

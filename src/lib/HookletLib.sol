@@ -387,6 +387,46 @@ library HookletLib {
         }
     }
 
+    /// @dev Calls IHooklet.afterSwap() after a rebalance order.
+    /// @param self The hooklet to call
+    /// @param sender The FloodPlain contract address
+    /// @param key The Bunni pool's key
+    /// @param zeroForOne True if the currency0 is the output token of the Flood order (thus the Bunni pool received currency0), false otherwise.
+    /// @param orderInputAmount The amount of the input token of the Flood order
+    /// @param orderOutputAmount The amount of the output token of the Flood order
+    function hookletAfterRebalance(
+        IHooklet self,
+        address sender,
+        PoolKey calldata key,
+        bool zeroForOne,
+        uint256 orderInputAmount,
+        uint256 orderOutputAmount
+    ) internal noSelfCall(self, sender) {
+        self.callHooklet(
+            IHooklet.afterSwap.selector,
+            abi.encodeCall(
+                IHooklet.afterSwap,
+                (
+                    sender,
+                    key,
+                    IPoolManager.SwapParams({
+                        zeroForOne: zeroForOne,
+                        amountSpecified: -int256(orderOutputAmount),
+                        sqrtPriceLimitX96: 0
+                    }),
+                    IHooklet.SwapReturnData({
+                        updatedSqrtPriceX96: 0,
+                        updatedTick: 0,
+                        inputAmount: orderOutputAmount,
+                        outputAmount: orderInputAmount,
+                        swapFee: 0,
+                        totalLiquidity: 0
+                    })
+                )
+            )
+        );
+    }
+
     function hasPermission(IHooklet self, uint160 flag) internal pure returns (bool) {
         return uint160(address(self)) & flag != 0;
     }
