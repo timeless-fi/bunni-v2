@@ -521,15 +521,21 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
             } else {
                 token = IERC20(Currency.unwrap(currency));
             }
+            uint256 tokenBalanceBefore = address(token).balanceOf(address(this));
             address(token).safeApproveWithRetry(address(vault), absAmount);
             reserveChange = vault.deposit(absAmount, address(this)).toInt256();
 
-            // it's safe to use absAmount here since at worst the vault.deposit() call pulled less token
-            // than requested
-            actualRawBalanceChange = -absAmount.toInt256();
+            // use actual deposited raw balance
+            uint256 actualDepositedAmount = tokenBalanceBefore - address(token).balanceOf(address(this));
+            if (actualDepositedAmount > absAmount) {
+                // somehow lost more tokens than requested
+                // this should never happen unless something is seriously wrong
+                revert BunniHub__VaultTookMoreThanRequested();
+            }
+            actualRawBalanceChange = -actualDepositedAmount.toInt256();
 
             // revoke token approval to vault if necessary
-            if (token.allowance(address(this), address(vault)) != 0) {
+            if (actualDepositedAmount != absAmount) {
                 address(token).safeApprove(address(vault), 0);
             }
         } else if (rawBalanceChange > 0) {
