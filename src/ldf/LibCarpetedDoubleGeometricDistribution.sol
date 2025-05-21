@@ -307,7 +307,7 @@ library LibCarpetedDoubleGeometricDistribution {
             }
             uint256 mainLiquidity = Q96.mulWad(WAD - params.weightCarpet);
             uint256 carpetLiquidity = Q96 - mainLiquidity;
-            return carpetLiquidity / uint24(numRoundedTicksCarpeted);
+            return carpetLiquidity.divUp(uint24(numRoundedTicksCarpeted));
         }
     }
 
