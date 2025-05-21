@@ -602,7 +602,7 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     function _getHookletOfPool(PoolId poolId) internal view returns (IHooklet hooklet) {
         address ptr = s.poolState[poolId].immutableParamsPointer;
         if (ptr == address(0)) return IHooklet(address(0));
-        bytes memory rawValue = ptr.read({start: 40, end: 60});
+        bytes memory rawValue = ptr.read({start: 134, end: 154});
         hooklet = IHooklet(address(bytes20(rawValue)));
     }
 

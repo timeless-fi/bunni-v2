@@ -588,6 +588,7 @@ contract BunniHubTest is BaseTest {
         assertEq(state.targetRawTokenRatio1, 0.1e6, "targetRawTokenRatio1 incorrect");
         assertEq(state.maxRawTokenRatio1, 0.12e6, "maxRawTokenRatio1 incorrect");
         assertEq(address(state.hooklet), address(hooklet_), "hooklet incorrect");
+        assertEq(address(hub.hookletOfPool(id)), address(hooklet_), "hub.hookletOfPool() incorrect");
 
         // verify decoded hookParams
         DecodedHookParams memory p = BunniHookLogic.decodeHookParams(hookParams);
