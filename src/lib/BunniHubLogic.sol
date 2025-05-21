@@ -345,14 +345,6 @@ library BunniHubLogic {
             ) {
                 revert BunniHub__DepositAmountTooSmall();
             }
-
-            // update token amounts to deposit into vaults
-            (returnData.reserveAmount0, returnData.reserveAmount1) = (
-                returnData.amount0
-                    - returnData.amount0.mulDiv(inputData.state.targetRawTokenRatio0, RAW_TOKEN_RATIO_BASE),
-                returnData.amount1
-                    - returnData.amount1.mulDiv(inputData.state.targetRawTokenRatio1, RAW_TOKEN_RATIO_BASE)
-            );
         } else {
             // already initialized liquidity shape
             // simply add tokens at the current ratio
@@ -370,10 +362,13 @@ library BunniHubLogic {
             returnData.amount1 = balance0 == 0
                 ? amount1Desired
                 : FixedPointMathLib.min(amount1Desired, amount0Desired.mulDiv(balance1, balance0));
-
-            returnData.reserveAmount0 = balance0 == 0 ? 0 : returnData.amount0.mulDiv(reserveBalance0, balance0);
-            returnData.reserveAmount1 = balance1 == 0 ? 0 : returnData.amount1.mulDiv(reserveBalance1, balance1);
         }
+
+        // update token amounts to deposit into vaults
+        (returnData.reserveAmount0, returnData.reserveAmount1) = (
+            returnData.amount0 - returnData.amount0.mulDiv(inputData.state.targetRawTokenRatio0, RAW_TOKEN_RATIO_BASE),
+            returnData.amount1 - returnData.amount1.mulDiv(inputData.state.targetRawTokenRatio1, RAW_TOKEN_RATIO_BASE)
+        );
 
         // modify reserveAmount0 and reserveAmount1 using ERC4626::maxDeposit()
         {
