@@ -30,6 +30,8 @@ import "./interfaces/IBunniHook.sol";
 import {Oracle} from "./lib/Oracle.sol";
 import {Ownable} from "./base/Ownable.sol";
 import {BaseHook} from "./base/BaseHook.sol";
+import {HookletLib} from "./lib/HookletLib.sol";
+import {IHooklet} from "./interfaces/IHooklet.sol";
 import {IBunniHub} from "./interfaces/IBunniHub.sol";
 import {BunniSwapMath} from "./lib/BunniSwapMath.sol";
 import {BunniHookLogic} from "./lib/BunniHookLogic.sol";
@@ -46,6 +48,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
 
     using SafeTransferLib for *;
     using FixedPointMathLib for *;
+    using HookletLib for IHooklet;
     using IdleBalanceLibrary for *;
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
@@ -583,6 +586,18 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
 
         // recompute idle balance
         BunniHookLogic.recomputeIdleBalance(s, hub, hookArgs.key);
+
+        // call hooklet
+        IHooklet hooklet = hub.hookletOfPool(id);
+        if (hooklet.hasPermission(HookletLib.AFTER_SWAP_FLAG)) {
+            hooklet.hookletAfterRebalance({
+                sender: msg.sender,
+                key: hookArgs.key,
+                zeroForOne: hookArgs.key.currency0 == args.currency,
+                orderInputAmount: hookArgs.preHookArgs.amount,
+                orderOutputAmount: orderOutputAmount
+            });
+        }
     }
 
     /// -----------------------------------------------------------------------
