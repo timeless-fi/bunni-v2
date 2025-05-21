@@ -813,7 +813,7 @@ library BunniHubLogic {
 
         // validate vault fee value
         if (
-            vaultFee != 0 && dist(reserveChangeInUnderlying, postFeeAmount) > 1 // avoid reverting from normal rounding error
+            dist(reserveChangeInUnderlying, postFeeAmount) > 1 // avoid reverting from normal rounding error
                 && percentDelta(reserveChangeInUnderlying, postFeeAmount) > MAX_VAULT_FEE_ERROR
         ) {
             revert BunniHub__VaultFeeIncorrect();

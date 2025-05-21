@@ -2,6 +2,8 @@
 pragma solidity ^0.8.15;
 
 import "./BaseTest.sol";
+import {BunniHub__VaultFeeIncorrect} from "../src/base/Errors.sol";
+import {UniformDistribution} from "../src/ldf/UniformDistribution.sol";
 
 contract BunniHubTest is BaseTest {
     using TickMath for *;
@@ -981,5 +983,139 @@ contract BunniHubTest is BaseTest {
         vm.prank(guy);
         vm.expectRevert(BunniHub__Unauthorized.selector);
         hub.setPauseFlags(pauseFlags);
+    }
+
+    function test_WrongIdleBalanceComputation() public {
+        ILiquidityDensityFunction uniformDistribution =
+            new UniformDistribution(address(hub), address(bunniHook), address(quoter));
+        Currency currency0 = Currency.wrap(address(token0));
+        Currency currency1 = Currency.wrap(address(token1));
+        ERC4626FeeMock feeVault0 = new ERC4626FeeMock(token0, 0);
+        ERC4626 vault0_ = ERC4626(address(feeVault0));
+        ERC4626 vault1_ = ERC4626(address(0));
+        IBunniToken bunniToken;
+        PoolKey memory key;
+        (bunniToken, key) = hub.deployBunniToken(
+            IBunniHub.DeployBunniTokenParams({
+                currency0: currency0,
+                currency1: currency1,
+                tickSpacing: TICK_SPACING,
+                twapSecondsAgo: TWAP_SECONDS_AGO,
+                liquidityDensityFunction: uniformDistribution,
+                hooklet: IHooklet(address(0)),
+                ldfType: LDFType.DYNAMIC_AND_STATEFUL,
+                ldfParams: bytes32(abi.encodePacked(ShiftMode.STATIC, int24(-5) * TICK_SPACING, int24(5) * TICK_SPACING)),
+                hooks: bunniHook,
+                hookParams: abi.encodePacked(
+                    FEE_MIN,
+                    FEE_MAX,
+                    FEE_QUADRATIC_MULTIPLIER,
+                    FEE_TWAP_SECONDS_AGO,
+                    POOL_MAX_AMAMM_FEE,
+                    SURGE_HALFLIFE,
+                    SURGE_AUTOSTART_TIME,
+                    VAULT_SURGE_THRESHOLD_0,
+                    VAULT_SURGE_THRESHOLD_1,
+                    REBALANCE_THRESHOLD,
+                    REBALANCE_MAX_SLIPPAGE,
+                    REBALANCE_TWAP_SECONDS_AGO,
+                    REBALANCE_ORDER_TTL,
+                    true, // amAmmEnabled
+                    ORACLE_MIN_INTERVAL,
+                    MIN_RENT_MULTIPLIER
+                ),
+                vault0: vault0_,
+                vault1: vault1_,
+                minRawTokenRatio0: 0.2e6,
+                targetRawTokenRatio0: 0.3e6,
+                maxRawTokenRatio0: 0.4e6,
+                minRawTokenRatio1: 0,
+                targetRawTokenRatio1: 0,
+                maxRawTokenRatio1: 0,
+                sqrtPriceX96: TickMath.getSqrtPriceAtTick(0),
+                name: bytes32("BunniToken"),
+                symbol: bytes32("BUNNI-LP"),
+                owner: address(this),
+                metadataURI: "metadataURI",
+                salt: bytes32(0)
+            })
+        );
+
+        // make initial deposit to avoid accounting for MIN_INITIAL_SHARES
+        uint256 depositAmount0 = 1e18 + 1;
+        uint256 depositAmount1 = 1e18 + 1;
+        address firstDepositor = makeAddr("firstDepositor");
+        vm.startPrank(firstDepositor);
+        token0.approve(address(PERMIT2), type(uint256).max);
+        token1.approve(address(PERMIT2), type(uint256).max);
+        PERMIT2.approve(address(token0), address(hub), type(uint160).max, type(uint48).max);
+        PERMIT2.approve(address(token1), address(hub), type(uint160).max, type(uint48).max);
+        vm.stopPrank();
+
+        // mint tokens
+        _mint(key.currency0, firstDepositor, depositAmount0 * 100);
+        _mint(key.currency1, firstDepositor, depositAmount1 * 100);
+
+        // deposit tokens
+        IBunniHub.DepositParams memory depositParams = IBunniHub.DepositParams({
+            poolKey: key,
+            amount0Desired: depositAmount0,
+            amount1Desired: depositAmount1,
+            amount0Min: 0,
+            amount1Min: 0,
+            deadline: block.timestamp,
+            recipient: firstDepositor,
+            refundRecipient: firstDepositor,
+            vaultFee0: 0,
+            vaultFee1: 0,
+            referrer: address(0)
+        });
+
+        vm.startPrank(firstDepositor);
+        (uint256 sharesFirstDepositor, uint256 firstDepositorAmount0In, uint256 firstDepositorAmount1In) =
+            hub.deposit(depositParams);
+        console.log("Amount 0 deposited by first depositor", firstDepositorAmount0In);
+        console.log("Amount 1 deposited by first depositor", firstDepositorAmount1In);
+        console.log("Total supply shares", bunniToken.totalSupply());
+        vm.stopPrank();
+
+        IdleBalance idleBalanceBefore = hub.idleBalance(key.toId());
+        (uint256 idleAmountBefore, bool isToken0Before) = IdleBalanceLibrary.fromIdleBalance(idleBalanceBefore);
+        feeVault0.setFee(1000); // 10% fee
+
+        depositAmount0 = 1e18;
+        depositAmount1 = 1e18;
+        address secondDepositor = makeAddr("secondDepositor");
+        vm.startPrank(secondDepositor);
+        token0.approve(address(PERMIT2), type(uint256).max);
+        token1.approve(address(PERMIT2), type(uint256).max);
+        PERMIT2.approve(address(token0), address(hub), type(uint160).max, type(uint48).max);
+        PERMIT2.approve(address(token1), address(hub), type(uint160).max, type(uint48).max);
+        vm.stopPrank();
+
+        // mint tokens
+        _mint(key.currency0, secondDepositor, depositAmount0);
+        _mint(key.currency1, secondDepositor, depositAmount1);
+
+        // deposit tokens
+        depositParams = IBunniHub.DepositParams({
+            poolKey: key,
+            amount0Desired: depositAmount0,
+            amount1Desired: depositAmount1,
+            amount0Min: 0,
+            amount1Min: 0,
+            deadline: block.timestamp,
+            recipient: secondDepositor,
+            refundRecipient: secondDepositor,
+            vaultFee0: 0,
+            vaultFee1: 0,
+            referrer: address(0)
+        });
+
+        vm.startPrank(secondDepositor);
+        vm.expectRevert(BunniHub__VaultFeeIncorrect.selector);
+        (uint256 sharesSecondDepositor, uint256 secondDepositorAmount0In, uint256 secondDepositorAmount1In) =
+            hub.deposit(depositParams);
+        vm.stopPrank();
     }
 }
