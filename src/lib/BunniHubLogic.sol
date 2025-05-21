@@ -419,14 +419,19 @@ library BunniHubLogic {
         // update queued withdrawal
         // use unchecked to get unlockTimestamp to overflow back to 0 if overflow occurs
         // which is fine since we only care about relative time
+        uint56 blockTimestamp = uint56(block.timestamp);
         uint56 newUnlockTimestamp;
         unchecked {
-            newUnlockTimestamp = uint56(block.timestamp) + WITHDRAW_DELAY;
+            newUnlockTimestamp = blockTimestamp + WITHDRAW_DELAY;
         }
         if (queued.shareAmount != 0) {
             // requeue expired queued withdrawal
-            if (queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD >= block.timestamp) {
-                revert BunniHub__NoExpiredWithdrawal();
+            // if queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD overflows it's fine to requeue
+            // it's safe since the LP will still have to wait to withdraw
+            unchecked {
+                if (queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD >= blockTimestamp) {
+                    revert BunniHub__NoExpiredWithdrawal();
+                }
             }
             s.queuedWithdrawals[id][msgSender].unlockTimestamp = newUnlockTimestamp;
         } else {
@@ -489,10 +494,18 @@ library BunniHubLogic {
         if (params.useQueuedWithdrawal) {
             // use queued withdrawal
             // need to withdraw the full queued amount
+            uint56 blockTimestamp = uint56(block.timestamp);
             QueuedWithdrawal memory queued = s.queuedWithdrawals[poolId][msgSender];
             if (queued.shareAmount == 0 || queued.unlockTimestamp == 0) revert BunniHub__QueuedWithdrawalNonexistent();
-            if (block.timestamp < queued.unlockTimestamp) revert BunniHub__QueuedWithdrawalNotReady();
-            if (queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD < block.timestamp) revert BunniHub__GracePeriodExpired();
+            if (blockTimestamp < queued.unlockTimestamp) revert BunniHub__QueuedWithdrawalNotReady();
+            // use unchecked to avoid reverting on overflow
+            // if queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD overflows but not blockTimestamp, we will revert
+            // the user will just need to requeue the withdraw
+            unchecked {
+                if (queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD < blockTimestamp) {
+                    revert BunniHub__GracePeriodExpired();
+                }
+            }
             shares = queued.shareAmount;
             s.queuedWithdrawals[poolId][msgSender].shareAmount = 0; // don't delete the struct to save gas later
             state.bunniToken.burn(address(this), shares); // BunniTokens were deposited to address(this) earlier with queueWithdraw()
