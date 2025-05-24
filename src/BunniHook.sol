@@ -213,7 +213,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
             abi.decode(callbackData, (Currency, uint256, PoolKey, bool));
 
         // pull claim tokens from BunniHub
-        hub.hookHandleSwap({key: key, zeroForOne: zeroForOne, inputAmount: 0, outputAmount: amount});
+        hub.hookHandleSwap({key: key, zeroForOne: zeroForOne, inputAmount: 0, outputAmount: amount, shouldSurge: false});
 
         // lock BunniHub to prevent reentrancy
         hub.lockForRebalance(key);
@@ -245,7 +245,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         hub.unlockForRebalance(key);
 
         // push claim tokens to BunniHub
-        hub.hookHandleSwap({key: key, zeroForOne: zeroForOne, inputAmount: paid, outputAmount: 0});
+        hub.hookHandleSwap({key: key, zeroForOne: zeroForOne, inputAmount: paid, outputAmount: 0, shouldSurge: false});
     }
 
     /// @dev Claims protocol fees earned and sends it to the recipient.
