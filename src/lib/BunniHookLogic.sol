@@ -475,7 +475,9 @@ library BunniHookLogic {
         // - pull input claim tokens from hook
         // - push output tokens to pool manager and mint claim tokens to hook
         // - update raw token balances
-        env.hub.hookHandleSwap(key, params.zeroForOne, hookHandleSwapInputAmount, hookHandleSwapOutoutAmount);
+        env.hub.hookHandleSwap(
+            key, params.zeroForOne, hookHandleSwapInputAmount, hookHandleSwapOutoutAmount, shouldSurge
+        );
 
         // burn output claim tokens
         env.poolManager.burn(address(this), outputToken.toId(), outputAmount);

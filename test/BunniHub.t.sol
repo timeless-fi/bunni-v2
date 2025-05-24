@@ -823,7 +823,7 @@ contract BunniHubTest is BaseTest {
         if (pauseFlags & (1 << 4) != 0) {
             // hookHandleSwap() is paused
             vm.expectRevert(BunniHub__Paused.selector);
-            hub.hookHandleSwap(key, true, 0, 0);
+            hub.hookHandleSwap(key, true, 0, 0, false);
         }
 
         if (pauseFlags & (1 << 5) != 0) {
@@ -938,7 +938,7 @@ contract BunniHubTest is BaseTest {
         vm.startPrank(address(bunniHook));
 
         // hookHandleSwap() is not paused
-        hub.hookHandleSwap(key, true, 0, 0);
+        hub.hookHandleSwap(key, true, 0, 0, false);
 
         // hookSetIdleBalance() is not paused
         hub.hookSetIdleBalance(key, IdleBalanceLibrary.ZERO);

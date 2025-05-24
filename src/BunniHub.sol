@@ -189,12 +189,13 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IBunniHub
-    function hookHandleSwap(PoolKey calldata key, bool zeroForOne, uint256 inputAmount, uint256 outputAmount)
-        external
-        override
-        nonReentrant
-        notPaused(4)
-    {
+    function hookHandleSwap(
+        PoolKey calldata key,
+        bool zeroForOne,
+        uint256 inputAmount,
+        uint256 outputAmount,
+        bool shouldSurge
+    ) external override nonReentrant notPaused(4) {
         if (msg.sender != address(key.hooks)) revert BunniHub__Unauthorized();
 
         // load state
@@ -231,7 +232,8 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
         }
 
         // update raw token balances if we're using vaults and the (rawBalance / balance) ratio is outside the bounds
-        if (address(state.vault0) != address(0)) {
+        // skip depositing into vaults if we're surging since we need to use raw tokens for rebalancing anyways
+        if (address(state.vault0) != address(0) && !(shouldSurge && zeroForOne)) {
             (state.reserve0, state.rawBalance0) = _updateRawBalanceIfNeeded(
                 key.currency0,
                 state.vault0,
@@ -242,7 +244,7 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
                 state.targetRawTokenRatio0
             );
         }
-        if (address(state.vault1) != address(0)) {
+        if (address(state.vault1) != address(0) && !(shouldSurge && !zeroForOne)) {
             (state.reserve1, state.rawBalance1) = _updateRawBalanceIfNeeded(
                 key.currency1,
                 state.vault1,

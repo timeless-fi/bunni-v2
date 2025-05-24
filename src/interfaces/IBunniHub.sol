@@ -267,8 +267,14 @@ interface IBunniHub is IUnlockCallback, IOwnable {
     /// @param zeroForOne True if the swap is for token0->token1, false if token1->token0
     /// @param inputAmount The amount of the input token to pull from the hook
     /// @param outputAmount The amount of the output token to push to the hook
-    function hookHandleSwap(PoolKey calldata key, bool zeroForOne, uint256 inputAmount, uint256 outputAmount)
-        external;
+    /// @param shouldSurge True if the pool should surge before the swap
+    function hookHandleSwap(
+        PoolKey calldata key,
+        bool zeroForOne,
+        uint256 inputAmount,
+        uint256 outputAmount,
+        bool shouldSurge
+    ) external;
 
     /// @notice Called by the hook to set the idle balance of a Bunni pool.
     /// @param key The PoolKey of the Uniswap V4 pool
