@@ -534,9 +534,22 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
             }
             actualRawBalanceChange = -actualDepositedAmount.toInt256();
 
-            // revoke token approval to vault if necessary
             if (actualDepositedAmount != absAmount) {
+                // revoke token approval to vault
                 address(token).safeApprove(address(vault), 0);
+
+                // deposit excess amount back into PoolManager as claim tokens
+                uint256 excessAmount = absAmount - actualDepositedAmount;
+                poolManager.sync(currency); // sync poolManager balance before transferring assets to it
+                if (currency.isAddressZero()) {
+                    // unwrap WETH and settle using ETH
+                    weth.withdraw(excessAmount);
+                    poolManager.settle{value: excessAmount}();
+                } else {
+                    currency.transfer(address(poolManager), excessAmount);
+                    excessAmount = poolManager.settle(); // use actual settled amount in case of transfer tax
+                }
+                poolManager.mint(address(this), currency.toId(), excessAmount);
             }
         } else if (rawBalanceChange > 0) {
             // sync poolManager balance before transferring assets to it
