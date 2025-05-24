@@ -151,7 +151,13 @@ library BunniHubLogic {
         uint256 amount1Spent = rawAmount1;
         if (address(state.vault0) != address(0) && reserveAmount0 != 0) {
             (uint256 reserveChange, uint256 reserveChangeInUnderlying, uint256 amountSpent) = _depositVaultReserve(
-                env, reserveAmount0, params.poolKey.currency0, state.vault0, msgSender, params.vaultFee0
+                env,
+                reserveAmount0,
+                params.poolKey.currency0,
+                state.vault0,
+                msgSender,
+                params.refundRecipient,
+                params.vaultFee0
             );
             s.reserve0[poolId] = state.reserve0 + reserveChange;
 
@@ -163,7 +169,13 @@ library BunniHubLogic {
         }
         if (address(state.vault1) != address(0) && reserveAmount1 != 0) {
             (uint256 reserveChange, uint256 reserveChangeInUnderlying, uint256 amountSpent) = _depositVaultReserve(
-                env, reserveAmount1, params.poolKey.currency1, state.vault1, msgSender, params.vaultFee1
+                env,
+                reserveAmount1,
+                params.poolKey.currency1,
+                state.vault1,
+                msgSender,
+                params.refundRecipient,
+                params.vaultFee1
             );
             s.reserve1[poolId] = state.reserve1 + reserveChange;
 
@@ -774,6 +786,7 @@ library BunniHubLogic {
     /// @param currency The currency to deposit.
     /// @param vault The vault to deposit into.
     /// @param user The user to deposit tokens from.
+    /// @param refundRecipient The recipient of the refunded tokens.
     /// @param vaultFee The vault's withdrawal fee, in 18 decimals.
     /// @return reserveChange The change in reserve balance.
     /// @return reserveChangeInUnderlying The change in reserve balance in underlying tokens.
@@ -783,6 +796,7 @@ library BunniHubLogic {
         Currency currency,
         ERC4626 vault,
         address user,
+        address refundRecipient,
         uint256 vaultFee
     ) internal returns (uint256 reserveChange, uint256 reserveChangeInUnderlying, uint256 amountSpent) {
         // use the pre-fee amount to ensure `amount` is the amount of tokens
@@ -792,7 +806,6 @@ library BunniHubLogic {
         // and if user provide fee!=0 when the fee is some other value (0 or non-zero) the validation will revert
         uint256 postFeeAmount = amount; // cache amount to use for validation later
         amount = amount.divWadUp(WAD - vaultFee);
-        amountSpent = amount;
 
         IERC20 token;
         if (currency.isAddressZero()) {
@@ -807,9 +820,18 @@ library BunniHubLogic {
         }
 
         // do vault deposit
+        uint256 tokenBalanceBefore = address(token).balanceOf(address(this));
         address(token).safeApproveWithRetry(address(vault), amount);
         reserveChange = vault.deposit(amount, address(this));
         reserveChangeInUnderlying = vault.previewRedeem(reserveChange);
+
+        // use actual tokens spent
+        amountSpent = tokenBalanceBefore - address(token).balanceOf(address(this));
+        if (amountSpent > amount) {
+            // somehow lost more tokens than requested
+            // this should never happen unless something is seriously wrong
+            revert BunniHub__VaultTookMoreThanRequested();
+        }
 
         // validate vault fee value
         if (
@@ -819,9 +841,18 @@ library BunniHubLogic {
             revert BunniHub__VaultFeeIncorrect();
         }
 
-        // revoke token approval to vault if necessary
-        if (token.allowance(address(this), address(vault)) != 0) {
+        if (amountSpent != amount) {
+            // revoke token approval to vault
             address(token).safeApprove(address(vault), 0);
+
+            if (currency.isAddressZero()) {
+                // unwrap excess WETH
+                // no need to refund since we do so in deposit()
+                env.weth.withdraw(amount - amountSpent);
+            } else {
+                // refund excess tokens to refundRecipient
+                address(token).safeTransfer(refundRecipient, amount - amountSpent);
+            }
         }
     }
 

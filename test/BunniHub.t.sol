@@ -2,6 +2,7 @@
 pragma solidity ^0.8.15;
 
 import "./BaseTest.sol";
+import {ERC4626TakeLessMock} from "./mocks/ERC4626TakeLessMock.sol";
 
 contract BunniHubTest is BaseTest {
     using TickMath for *;
@@ -981,5 +982,68 @@ contract BunniHubTest is BaseTest {
         vm.prank(guy);
         vm.expectRevert(BunniHub__Unauthorized.selector);
         hub.setPauseFlags(pauseFlags);
+    }
+
+    function test_vaultTakeLess_duringSwap() public {
+        // deploy vault
+        ERC4626TakeLessMock vault = new ERC4626TakeLessMock(token0);
+
+        // deploy pool
+        (, PoolKey memory key) = _deployPoolAndInitLiquidity(
+            Currency.wrap(address(token0)), Currency.wrap(address(token1)), vault, ERC4626(address(0))
+        );
+        (uint256 beforeBalance0,) = hub.poolBalances(key.toId());
+
+        // swap a lot of token0 into the pool
+        uint256 swapAmount = 10 ether;
+        _mint(key.currency0, address(this), swapAmount);
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -int256(swapAmount),
+            sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+        });
+        _swap(key, params, 0, "");
+
+        assertEq(token0.balanceOf(address(hub)), 0, "hub should have no token0 ERC20 balance");
+        assertEq(token0.allowance(address(hub), address(vault)), 0, "hub should have no allowance to vault");
+        (uint256 afterBalance0,) = hub.poolBalances(key.toId());
+        assertEq(afterBalance0 - beforeBalance0, swapAmount, "pool balance change incorrect");
+    }
+
+    function test_vaultTakeLess_duringDeposit() public {
+        // deploy vault
+        ERC4626TakeLessMock vault = new ERC4626TakeLessMock(token0);
+
+        // deploy pool
+        (, PoolKey memory key) = _deployPoolAndInitLiquidity(
+            Currency.wrap(address(token0)), Currency.wrap(address(token1)), vault, ERC4626(address(0))
+        );
+        (uint256 beforeBalance0,) = hub.poolBalances(key.toId());
+
+        // deposit
+        uint256 depositAmount = 10 ether;
+        _mint(key.currency0, address(this), depositAmount * 10);
+        _mint(key.currency1, address(this), depositAmount * 10);
+        uint256 beforeThisBalance0 = token0.balanceOf(address(this));
+        IBunniHub.DepositParams memory depositParams = IBunniHub.DepositParams({
+            poolKey: key,
+            amount0Desired: depositAmount,
+            amount1Desired: depositAmount * 10,
+            amount0Min: 0,
+            amount1Min: 0,
+            deadline: block.timestamp,
+            recipient: address(this),
+            refundRecipient: address(this),
+            vaultFee0: 0.5e18, // since vault only takes half of requested amount we need to effectively use 2x the tokens
+            vaultFee1: 0,
+            referrer: address(0)
+        });
+        hub.deposit(depositParams);
+
+        assertEq(token0.balanceOf(address(hub)), 0, "hub should have no token0 ERC20 balance");
+        assertEq(token0.allowance(address(hub), address(vault)), 0, "hub should have no allowance to vault");
+        (uint256 afterBalance0,) = hub.poolBalances(key.toId());
+        assertEq(afterBalance0 - beforeBalance0, depositAmount, "pool balance change incorrect");
+        assertEq(beforeThisBalance0 - token0.balanceOf(address(this)), depositAmount, "user deposited amount incorrect");
     }
 }

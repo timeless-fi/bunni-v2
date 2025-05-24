@@ -26,6 +26,7 @@ error BunniHub__QueuedWithdrawalNotReady();
 error BunniHub__BunniTokenNotInitialized();
 error BunniHub__NeedToUseQueuedWithdrawal();
 error BunniHub__InvalidRawTokenRatioBounds();
+error BunniHub__VaultTookMoreThanRequested();
 error BunniHub__QueuedWithdrawalNonexistent();
 error BunniHub__MsgValueNotZeroWhenPoolKeyHasNoNativeToken();
 
