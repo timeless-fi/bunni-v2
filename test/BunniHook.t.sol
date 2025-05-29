@@ -399,7 +399,7 @@ contract BunniHookTest is BaseTest {
         // enable protocol fees
         vm.prank(HOOK_FEE_RECIPIENT_CONTROLLER);
         bunniHook.setHookFeeRecipient(HOOK_FEE_RECIPIENT);
-        bunniHook.setModifiers(HOOK_FEE_MODIFIER, REFERRAL_REWARD_MODIFIER);
+        bunniHook.setHookFeeModifier(HOOK_FEE_MODIFIER);
 
         // create new bunni token
         (, PoolKey memory key) = _deployPoolAndInitLiquidity(currency0, currency1, vault0_, vault1_);
@@ -1014,8 +1014,7 @@ contract BunniHookTest is BaseTest {
             recipient: address(this),
             refundRecipient: address(this),
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         (bool success, uint256 shares, uint256 amount0, uint256 amount1) =
             quoter.quoteDeposit(address(this), depositParams);
@@ -1503,8 +1502,7 @@ contract BunniHookTest is BaseTest {
             recipient: address(this),
             refundRecipient: address(this),
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         _mint(key.currency0, address(this), depositParams.amount0Desired);
         _mint(key.currency1, address(this), depositParams.amount1Desired);
@@ -1758,13 +1756,11 @@ contract BunniHookTest is BaseTest {
         // initial hook fee recipient and fee modifier are zero
         assertEq(bunniHook.getHookFeeRecipient(), address(0), "hook fee recipient should be zero initially");
         uint32 hookFeeModifier_ = bunniHook.getHookFeeModifier();
-        uint32 referralRewardModifier_ = bunniHook.getReferralRewardModifier();
         assertEq(hookFeeModifier_, 0, "hook fee modifier should be zero initially");
-        assertEq(referralRewardModifier_, 0, "referral reward modifier should be zero initially");
 
         // cannot change fee before hook recipient is set
         vm.expectRevert(BunniHook__HookFeeRecipientNotSet.selector);
-        bunniHook.setModifiers(HOOK_FEE_MODIFIER, REFERRAL_REWARD_MODIFIER);
+        bunniHook.setHookFeeModifier(HOOK_FEE_MODIFIER);
 
         // set hook fee recipient
         vm.prank(HOOK_FEE_RECIPIENT_CONTROLLER);
@@ -1777,34 +1773,26 @@ contract BunniHookTest is BaseTest {
         bunniHook.setHookFeeRecipient(address(0x1234));
 
         // can now change fee modifier
-        bunniHook.setModifiers(HOOK_FEE_MODIFIER, REFERRAL_REWARD_MODIFIER);
+        bunniHook.setHookFeeModifier(HOOK_FEE_MODIFIER);
         hookFeeModifier_ = bunniHook.getHookFeeModifier();
-        referralRewardModifier_ = bunniHook.getReferralRewardModifier();
         assertEq(hookFeeModifier_, HOOK_FEE_MODIFIER, "hook fee modifier should be set");
-        assertEq(referralRewardModifier_, REFERRAL_REWARD_MODIFIER, "referral reward modifier should be set");
 
         // cannot set hook fee modifier to zero after set
         vm.expectRevert(BunniHook__InvalidModifier.selector);
-        bunniHook.setModifiers(0, REFERRAL_REWARD_MODIFIER);
+        bunniHook.setHookFeeModifier(0);
 
         // cannot set hook fee modifier to above 50%
         vm.expectRevert(BunniHook__InvalidModifier.selector);
-        bunniHook.setModifiers(0.5e6 + 1, REFERRAL_REWARD_MODIFIER);
+        bunniHook.setHookFeeModifier(0.5e6 + 1);
 
         // cannot set hook fee modifier to below 10%
         vm.expectRevert(BunniHook__InvalidModifier.selector);
-        bunniHook.setModifiers(0.1e6 - 1, REFERRAL_REWARD_MODIFIER);
+        bunniHook.setHookFeeModifier(0.1e6 - 1);
 
         // can set hook fee modifier to different non-zero value after set
-        bunniHook.setModifiers(HOOK_FEE_MODIFIER * 2, REFERRAL_REWARD_MODIFIER * 2);
+        bunniHook.setHookFeeModifier(HOOK_FEE_MODIFIER * 2);
         hookFeeModifier_ = bunniHook.getHookFeeModifier();
-        referralRewardModifier_ = bunniHook.getReferralRewardModifier();
         assertEq(hookFeeModifier_, HOOK_FEE_MODIFIER * 2, "hook fee modifier should be updated after set");
-        assertEq(
-            referralRewardModifier_,
-            REFERRAL_REWARD_MODIFIER * 2,
-            "referral reward modifier should be updated after set"
-        );
     }
 
     function test_protocolFeeSwitch_ownerCanSetRecipientAfter180Days() public {

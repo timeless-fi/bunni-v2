@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.0;
 
-import {ERC20Referrer} from "../../src/base/ERC20Referrer.sol";
+import {ERC20Lockable} from "../../src/base/ERC20Lockable.sol";
 
-contract ERC20ReferrerMock is ERC20Referrer {
-    function mint(address to, uint256 amount, address referrer) public {
-        _mint(to, amount, referrer);
+contract ERC20LockableMock is ERC20Lockable {
+    function mint(address to, uint256 amount) public {
+        _mint(to, amount);
     }
 
     function burn(uint256 amount) public {
@@ -14,10 +14,10 @@ contract ERC20ReferrerMock is ERC20Referrer {
     }
 
     function name() public pure override returns (string memory) {
-        return "MockERC20";
+        return "MockERC20Lockable";
     }
 
     function symbol() public pure override returns (string memory) {
-        return "MOCK-ERC20";
+        return "MOCK-ERC20Lockable";
     }
 }

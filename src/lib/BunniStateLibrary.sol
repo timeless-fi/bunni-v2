@@ -44,13 +44,6 @@ library BunniStateLibrary {
         }
     }
 
-    function getReferralRewardModifier(IBunniHook hook) internal view returns (uint32 referralRewardModifier) {
-        bytes32 data = hook.extsload(HOOK_FEE_SLOT);
-        assembly ("memory-safe") {
-            referralRewardModifier := and(0xffffffff, shr(192, data))
-        }
-    }
-
     function _getVaultSharePricesSlot(PoolId poolId) internal pure returns (bytes32) {
         return keccak256(abi.encode(PoolId.unwrap(poolId), VAULT_SHARE_PRICES_SLOT));
     }

@@ -87,9 +87,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm, Ext
     /// @notice Used for computing the hook fee amount. Fee taken is `amount * swapFee / 1e6 * hookFeesModifier / 1e6`.
     uint32 internal hookFeeModifier;
 
-    /// @notice Used for computing the referral reward amount. Reward is `hookFee * referralRewardModifier / 1e6`.
-    uint32 internal referralRewardModifier;
-
     /// @notice The FloodZone contract used in rebalance orders.
     IZone internal floodZone;
 
@@ -348,12 +345,9 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm, Ext
     }
 
     /// @inheritdoc IBunniHook
-    function setModifiers(uint32 newHookFeeModifier, uint32 newReferralRewardModifier) external onlyOwner {
+    function setHookFeeModifier(uint32 newHookFeeModifier) external onlyOwner {
         // hook fee can't be turned off once turned on, and cannot exceed 50% and cannot be less than 10%
-        if (
-            newHookFeeModifier > MODIFIER_BASE / 2 || newHookFeeModifier < MODIFIER_BASE / 10
-                || newReferralRewardModifier > MODIFIER_BASE
-        ) {
+        if (newHookFeeModifier > MODIFIER_BASE / 2 || newHookFeeModifier < MODIFIER_BASE / 10) {
             revert BunniHook__InvalidModifier();
         }
         // hook fee can only be turned on if hook fee recipient is set
@@ -362,9 +356,8 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm, Ext
         }
 
         hookFeeModifier = newHookFeeModifier;
-        referralRewardModifier = newReferralRewardModifier;
 
-        emit SetModifiers(newHookFeeModifier, newReferralRewardModifier);
+        emit SetHookFeeModifier(newHookFeeModifier);
     }
 
     /// @inheritdoc IBunniHook
@@ -476,7 +469,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm, Ext
             s,
             BunniHookLogic.Env({
                 hookFeeModifier: hookFeeModifier,
-                referralRewardModifier: referralRewardModifier,
                 floodZone: floodZone,
                 hub: hub,
                 poolManager: poolManager,

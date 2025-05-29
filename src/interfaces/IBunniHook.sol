@@ -57,7 +57,7 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm, 
     );
     event SetZone(IZone zone);
     event SetHookFeeRecipient(address hookFeeRecipient);
-    event SetModifiers(uint32 indexed hookFeeModifier, uint32 indexed referrerRewardModifier);
+    event SetHookFeeModifier(uint32 indexed hookFeeModifier);
     event SetWithdrawalUnblocked(PoolId indexed id, bool unblocked);
     event ScheduleKChange(uint48 currentK, uint48 indexed newK, uint160 indexed activeBlock);
     event ClaimProtocolFees(Currency[] currencyList, address indexed recipient);
@@ -185,10 +185,9 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm, 
     /// @param newProtocolFeeRecipient The new protocol fee recipient address
     function setHookFeeRecipient(address newProtocolFeeRecipient) external;
 
-    /// @notice Set the hook fee & referral reward params. Only callable by the owner.
+    /// @notice Set the hook fee params. Only callable by the owner.
     /// @param newHookFeeModifier The new hook fee modifier. 6 decimals.
-    /// @param newReferralRewardModifier The new referral reward modifier. 6 decimals.
-    function setModifiers(uint32 newHookFeeModifier, uint32 newReferralRewardModifier) external;
+    function setHookFeeModifier(uint32 newHookFeeModifier) external;
 
     /// @notice Set whether withdrawals are unblocked for the given pool. Only callable by the owner.
     /// @param id The pool id

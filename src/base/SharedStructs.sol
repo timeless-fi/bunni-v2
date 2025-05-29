@@ -32,7 +32,6 @@ struct QueuedWithdrawal {
 /// @member queuedWithdrawals The queued withdrawals for a given pool & user
 /// @member isPauser The set of addresses that can pause external functions
 /// @member hookWhitelist The set of hooks that are whitelisted to be used in new pools
-/// @member referralRewardRecipient The address of the recipient of referral rewards belonging to the default referrer address(0)
 /// @member pauseFlags Bit flags for pausing external functions
 /// @member unpauseFuse Can be permanently set to true to unpause all external functions
 struct HubStorage {
@@ -45,7 +44,6 @@ struct HubStorage {
     mapping(PoolId poolId => mapping(address => QueuedWithdrawal)) queuedWithdrawals;
     mapping(address guy => bool) isPauser;
     mapping(IBunniHook hook => bool) hookWhitelist;
-    address referralRewardRecipient;
     uint8 pauseFlags;
     bool unpauseFuse;
 }

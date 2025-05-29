@@ -288,8 +288,7 @@ contract RebalanceAttackTest is BaseTest {
             recipient: address(attacker),
             refundRecipient: address(attacker),
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
 
         uint256 amount0 = Currency.wrap(order.consideration.token) == key.currency0

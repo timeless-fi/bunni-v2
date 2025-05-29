@@ -99,22 +99,17 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
         IPermit2 permit2_,
         IBunniToken bunniTokenImplementation_,
         address initialOwner,
-        address initialReferralRewardRecipient,
         IBunniHook[] memory initialHookWhitelist
     ) {
         require(
             address(permit2_) != address(0) && address(poolManager_) != address(0) && address(weth_) != address(0)
                 && address(bunniTokenImplementation_) != address(0) && initialOwner != address(0)
-                && initialReferralRewardRecipient != address(0)
         );
         weth = weth_;
         permit2 = permit2_;
         poolManager = poolManager_;
         bunniTokenImplementation = bunniTokenImplementation_;
         _initializeOwner(initialOwner);
-
-        s.referralRewardRecipient = initialReferralRewardRecipient;
-        emit SetReferralRewardRecipient(initialReferralRewardRecipient);
 
         // set initial hook whitelist
         for (uint256 i; i < initialHookWhitelist.length; i++) {
@@ -363,12 +358,6 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     /// -----------------------------------------------------------------------
 
     /// @inheritdoc IBunniHub
-    function setReferralRewardRecipient(address newReferralRewardRecipient) external onlyOwner {
-        s.referralRewardRecipient = newReferralRewardRecipient;
-        emit SetReferralRewardRecipient(newReferralRewardRecipient);
-    }
-
-    /// @inheritdoc IBunniHub
     function setPauser(address guy, bool status) external onlyOwner {
         s.isPauser[guy] = status;
         emit SetPauser(guy, status);
@@ -449,11 +438,6 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
     /// @inheritdoc IBunniHub
     function poolInitData() external view returns (bytes memory) {
         return INIT_DATA_TSLOT.tBytes().get();
-    }
-
-    /// @inheritdoc IBunniHub
-    function getReferralRewardRecipient() external view returns (address) {
-        return s.referralRewardRecipient;
     }
 
     /// @inheritdoc IBunniHub
