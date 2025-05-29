@@ -88,8 +88,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
             recipient: address(this),
             refundRecipient: address(this),
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         vm.expectRevert(BunniHub__MsgValueNotZeroWhenPoolKeyHasNoNativeToken.selector);
         hub.deposit{value: 1 ether}(depositParams);
@@ -447,8 +446,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
                 recipient: address(this),
                 refundRecipient: address(this),
                 vaultFee0: 0,
-                vaultFee1: 0,
-                referrer: address(0)
+                vaultFee1: 0
             })
         );
         data[1] = abi.encodeWithSelector(
@@ -463,8 +461,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
                 recipient: address(this),
                 refundRecipient: address(this),
                 vaultFee0: 0,
-                vaultFee1: 0,
-                referrer: address(0)
+                vaultFee1: 0
             })
         );
 
@@ -778,8 +775,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
                 recipient: address(this),
                 refundRecipient: address(this),
                 vaultFee0: 0,
-                vaultFee1: 0,
-                referrer: address(0)
+                vaultFee1: 0
             })
         );
     }
@@ -840,8 +836,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
                 recipient: address(this),
                 refundRecipient: address(this),
                 vaultFee0: 0,
-                vaultFee1: 0,
-                referrer: address(0)
+                vaultFee1: 0
             });
             vm.expectRevert(BunniHub__Paused.selector);
             hub.deposit(depositParams);
@@ -942,8 +937,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
             recipient: address(this),
             refundRecipient: address(this),
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         hub.deposit(depositParams);
 
@@ -1102,8 +1096,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
             recipient: address(this),
             refundRecipient: address(this),
             vaultFee0: 0.5e18, // since vault only takes half of requested amount we need to effectively use 2x the tokens
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         hub.deposit(depositParams);
 
@@ -1313,8 +1306,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
             recipient: firstDepositor,
             refundRecipient: firstDepositor,
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
 
         vm.startPrank(firstDepositor);
@@ -1354,8 +1346,7 @@ contract BunniHubTest is BaseTest, IUnlockCallback {
             recipient: secondDepositor,
             refundRecipient: secondDepositor,
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
 
         vm.startPrank(secondDepositor);

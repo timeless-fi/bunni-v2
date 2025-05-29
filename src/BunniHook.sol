@@ -86,9 +86,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// @notice Used for computing the hook fee amount. Fee taken is `amount * swapFee / 1e6 * hookFeesModifier / 1e6`.
     uint32 internal hookFeeModifier;
 
-    /// @notice Used for computing the referral reward amount. Reward is `hookFee * referralRewardModifier / 1e6`.
-    uint32 internal referralRewardModifier;
-
     /// @notice The FloodZone contract used in rebalance orders.
     IZone internal floodZone;
 
@@ -120,10 +117,9 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         address owner_,
         address hookFeeRecipient_,
         uint32 hookFeeModifier_,
-        uint32 referralRewardModifier_,
         uint48 k_
     ) BaseHook(poolManager_) {
-        if (hookFeeModifier_ > MODIFIER_BASE || referralRewardModifier_ > MODIFIER_BASE) {
+        if (hookFeeModifier_ > MODIFIER_BASE) {
             revert BunniHook__InvalidModifier();
         }
 
@@ -138,14 +134,13 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
 
         hookFeeRecipient = hookFeeRecipient_;
         hookFeeModifier = hookFeeModifier_;
-        referralRewardModifier = referralRewardModifier_;
         floodZone = floodZone_;
         _K = k_;
 
         _initializeOwner(owner_);
         poolManager_.setOperator(address(hub_), true);
 
-        emit SetModifiers(hookFeeModifier_, referralRewardModifier_);
+        emit SetHookFeeModifier(hookFeeModifier_);
     }
 
     /// -----------------------------------------------------------------------
@@ -319,15 +314,14 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     }
 
     /// @inheritdoc IBunniHook
-    function setModifiers(uint32 newHookFeeModifier, uint32 newReferralRewardModifier) external onlyOwner {
-        if (newHookFeeModifier > MODIFIER_BASE || newReferralRewardModifier > MODIFIER_BASE) {
+    function setHookFeeModifier(uint32 newHookFeeModifier) external onlyOwner {
+        if (newHookFeeModifier > MODIFIER_BASE) {
             revert BunniHook__InvalidModifier();
         }
 
         hookFeeModifier = newHookFeeModifier;
-        referralRewardModifier = newReferralRewardModifier;
 
-        emit SetModifiers(newHookFeeModifier, newReferralRewardModifier);
+        emit SetHookFeeModifier(newHookFeeModifier);
     }
 
     /// @inheritdoc IBunniHook
@@ -437,8 +431,8 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     }
 
     /// @inheritdoc IBunniHook
-    function getModifiers() external view returns (uint32 hookFeeModifier_, uint32 referralRewardModifier_) {
-        return (hookFeeModifier, referralRewardModifier);
+    function getHookFeeModifier() external view returns (uint32 hookFeeModifier_) {
+        return hookFeeModifier;
     }
 
     /// @inheritdoc IBunniHook
@@ -488,7 +482,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
             s,
             BunniHookLogic.Env({
                 hookFeeModifier: hookFeeModifier,
-                referralRewardModifier: referralRewardModifier,
                 floodZone: floodZone,
                 hub: hub,
                 poolManager: poolManager,

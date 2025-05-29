@@ -1007,8 +1007,7 @@ contract BunniHookTest is BaseTest {
             recipient: address(this),
             refundRecipient: address(this),
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         (bool success, uint256 shares, uint256 amount0, uint256 amount1) =
             quoter.quoteDeposit(address(this), depositParams);
@@ -1496,8 +1495,7 @@ contract BunniHookTest is BaseTest {
             recipient: address(this),
             refundRecipient: address(this),
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         _mint(key.currency0, address(this), depositParams.amount0Desired);
         _mint(key.currency1, address(this), depositParams.amount1Desired);

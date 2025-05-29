@@ -56,7 +56,6 @@ library BunniHookLogic {
 
     struct Env {
         uint32 hookFeeModifier;
-        uint32 referralRewardModifier;
         IBunniHub hub;
         IPoolManager poolManager;
         IFloodPlain floodPlain;
@@ -493,18 +492,6 @@ library BunniHookLogic {
 
         // burn output claim tokens
         env.poolManager.burn(address(this), outputToken.toId(), outputAmount);
-
-        // distribute part of hookFees to referrers
-        if (hookFeesAmount != 0) {
-            uint256 referrerRewardAmount = hookFeesAmount.mulDiv(env.referralRewardModifier, MODIFIER_BASE);
-            if (referrerRewardAmount != 0) {
-                if (!env.poolManager.isOperator(address(this), address(bunniState.bunniToken))) {
-                    env.poolManager.setOperator(address(bunniState.bunniToken), true);
-                }
-                bool isToken0 = exactIn != params.zeroForOne;
-                bunniState.bunniToken.distributeReferralRewards(isToken0, referrerRewardAmount);
-            }
-        }
 
         // emit swap event
         emit IBunniHook.Swap(

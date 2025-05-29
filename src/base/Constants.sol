@@ -16,7 +16,6 @@ uint256 constant MAX_VAULT_FEE_ERROR = 1e6;
 uint256 constant MAX_CARDINALITY = 2 ** 24 - 1;
 uint56 constant WITHDRAW_DELAY = 1 minutes;
 uint56 constant WITHDRAW_GRACE_PERIOD = 3 minutes;
-uint256 constant REFERRAL_REWARD_PER_TOKEN_PRECISION = 1e30;
 uint256 constant MODIFIER_BASE = 1e6;
 uint256 constant MIN_DEPOSIT_BALANCE_INCREASE = 1e6;
 uint24 constant MAX_AMAMM_FEE = 0.1e6;

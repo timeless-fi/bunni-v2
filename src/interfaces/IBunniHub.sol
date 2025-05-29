@@ -70,9 +70,6 @@ interface IBunniHub is IUnlockCallback, IOwnable {
     /// @param bunniToken The BunniToken associated with the call
     /// @param poolId The Uniswap V4 pool's ID
     event NewBunni(IBunniToken indexed bunniToken, PoolId indexed poolId);
-    /// @notice Emitted when the recipient of referral rewards of the default referrer address(0) is set
-    /// @param newReferralRewardRecipient The new recipient of referral rewards of the default referrer address(0)
-    event SetReferralRewardRecipient(address indexed newReferralRewardRecipient);
     /// @notice Emitted when a new address is added to or removed from the pauser set
     /// @param guy The address that was added or removed from the pauser set
     /// @param isPauser True if the address was added to the pauser set, false if it was removed
@@ -97,7 +94,6 @@ interface IBunniHub is IUnlockCallback, IOwnable {
     /// @param vaultFee0 When we deposit token0 into vault0, the deposit amount is multiplied by WAD / (WAD - vaultFee0),
     /// @param vaultFee1 When we deposit token1 into vault1, the deposit amount is multiplied by WAD / (WAD - vaultFee1),
     /// @param deadline The time by which the transaction must be included to effect the change
-    /// @param referrer The referrer of the liquidity provider. Used for fee sharing.
     struct DepositParams {
         PoolKey poolKey;
         address recipient;
@@ -109,7 +105,6 @@ interface IBunniHub is IUnlockCallback, IOwnable {
         uint256 vaultFee0;
         uint256 vaultFee1;
         uint256 deadline;
-        address referrer;
     }
 
     /// @notice Increases the amount of liquidity in a position, with tokens paid by the `msg.sender`
@@ -298,10 +293,6 @@ interface IBunniHub is IUnlockCallback, IOwnable {
     /// @param amount The amount of currency to give to the pool
     function hookGive(PoolKey calldata key, bool isCurrency0, uint256 amount) external;
 
-    /// @notice Sets the address of the recipient of referral rewards belonging to the default referrer address(0). Only callable by the owner.
-    /// @param newReferralRewardRecipient The new address of the recipient of referral rewards
-    function setReferralRewardRecipient(address newReferralRewardRecipient) external;
-
     /// @notice Adds or removes an address from the pauser set. Only callable by the owner.
     /// @param guy The address to add or remove from the pauser set
     /// @param isPauser True if the address should be added to the pauser set, false if it should be removed
@@ -351,9 +342,6 @@ interface IBunniHub is IUnlockCallback, IOwnable {
 
     /// @notice The idle balance of a Bunni pool.
     function idleBalance(PoolId poolId) external view returns (IdleBalance);
-
-    /// @notice The address of the recipient of referral rewards belonging to the default referrer address(0).
-    function getReferralRewardRecipient() external view returns (address);
 
     /// @notice Returns true if the given address is a pauser who can pause/unpause external functions.
     function isPauser(address guy) external view returns (bool);

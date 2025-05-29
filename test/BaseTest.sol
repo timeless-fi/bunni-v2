@@ -84,7 +84,6 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
     uint8 internal constant DECIMALS = 18;
     int24 internal constant TICK_SPACING = 10;
     uint32 internal constant HOOK_FEE_MODIFIER = 0.1e6;
-    uint32 internal constant REFERRAL_REWARD_MODIFIER = 0.1e6;
     uint48 internal constant K = 7200;
     uint32 internal constant ALPHA = 0.7e8;
     uint256 internal constant MAX_ERROR = 1e9;
@@ -191,7 +190,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
 
         // initialize bunni hub
         IBunniHook[] memory hookWhitelist = new IBunniHook[](0);
-        hub = new BunniHub(poolManager, weth, PERMIT2, new BunniToken(), address(this), address(this), hookWhitelist);
+        hub = new BunniHub(poolManager, weth, PERMIT2, new BunniToken(), address(this), hookWhitelist);
 
         // deploy zone
         zone = new BunniZone(address(this));
@@ -202,16 +201,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
             bytes memory hookCreationCode = abi.encodePacked(
                 type(BunniHook).creationCode,
                 abi.encode(
-                    poolManager,
-                    hub,
-                    floodPlain,
-                    weth,
-                    zone,
-                    address(this),
-                    HOOK_FEE_RECIPIENT,
-                    HOOK_FEE_MODIFIER,
-                    REFERRAL_REWARD_MODIFIER,
-                    K
+                    poolManager, hub, floodPlain, weth, zone, address(this), HOOK_FEE_RECIPIENT, HOOK_FEE_MODIFIER, K
                 )
             );
             for (uint256 offset; offset < 100000; offset++) {
@@ -224,16 +214,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
             }
         }
         bunniHook = new BunniHook{salt: hookSalt}(
-            poolManager,
-            hub,
-            floodPlain,
-            weth,
-            zone,
-            address(this),
-            HOOK_FEE_RECIPIENT,
-            HOOK_FEE_MODIFIER,
-            REFERRAL_REWARD_MODIFIER,
-            K
+            poolManager, hub, floodPlain, weth, zone, address(this), HOOK_FEE_RECIPIENT, HOOK_FEE_MODIFIER, K
         );
         vm.label(address(bunniHook), "BunniHook");
 
@@ -305,8 +286,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
             recipient: depositor,
             refundRecipient: depositor,
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         IBunniHub hub_ = hub;
         vm.startPrank(depositor);
@@ -345,8 +325,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
             recipient: depositor,
             refundRecipient: depositor,
             vaultFee0: vaultFee0,
-            vaultFee1: vaultFee1,
-            referrer: address(0)
+            vaultFee1: vaultFee1
         });
         IBunniHub hub_ = hub;
         vm.startPrank(depositor);

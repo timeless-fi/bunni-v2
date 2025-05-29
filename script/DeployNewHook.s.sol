@@ -29,7 +29,6 @@ contract DeployNewHookScript is CREATE3Script {
         address owner = vm.envAddress("OWNER");
         address hookFeeRecipient = vm.envAddress("HOOK_FEE_RECIPIENT");
         uint32 hookFeeModifier = vm.envUint("HOOK_FEE_MODIFIER").toUint32();
-        uint32 referralRewardModifier = vm.envUint("REFERRAL_REWARD_MODIFIER").toUint32();
         address floodPlain = vm.envAddress("FLOOD_PLAIN");
         uint48 k = vm.envUint(string.concat("AMAMM_K_", block.chainid.toString())).toUint48();
 
@@ -54,16 +53,7 @@ contract DeployNewHookScript is CREATE3Script {
                     bytes.concat(
                         type(BunniHook).creationCode,
                         abi.encode(
-                            poolManager,
-                            hub,
-                            floodPlain,
-                            weth,
-                            zone,
-                            owner,
-                            hookFeeRecipient,
-                            hookFeeModifier,
-                            referralRewardModifier,
-                            k
+                            poolManager, hub, floodPlain, weth, zone, owner, hookFeeRecipient, hookFeeModifier, k
                         )
                     )
                 )
