@@ -49,4 +49,42 @@ contract BunniStateLibraryTest is BaseTest {
         assertApproxEqAbs(sharePrice0, 4e18, 10, "share price 0 should be 4e18");
         assertApproxEqAbs(sharePrice1, 6e18, 10, "share price 1 should be 6e18");
     }
+
+    function test_getCuratorFees() public {
+        // deploy pool
+        (, PoolKey memory key) =
+            _deployPoolAndInitLiquidity(Currency.wrap(address(token0)), Currency.wrap(address(token1)), vault0, vault1);
+        PoolId id = key.toId();
+
+        // check that the curator fees are not initialized
+        (uint16 feeRate, uint120 accruedFee0, uint120 accruedFee1) = bunniHook.getCuratorFees(id);
+        assertEq(feeRate, 0, "fee rate should be 0");
+        assertEq(accruedFee0, 0, "accrued fee 0 should be 0");
+        assertEq(accruedFee1, 0, "accrued fee 1 should be 0");
+
+        // set the curator fee rate
+        bunniHook.curatorSetFeeRate(id, 100);
+
+        // check that the curator fee rate is set
+        (feeRate, accruedFee0, accruedFee1) = bunniHook.getCuratorFees(id);
+        assertEq(feeRate, 100, "fee rate should be 100");
+        assertEq(accruedFee0, 0, "accrued fee 0 should be 0");
+        assertEq(accruedFee1, 0, "accrued fee 1 should be 0");
+
+        // make a swap
+        // exactIn == true, zeroForOne == true, thus fee will be in token1
+        _mint(key.currency0, address(this), 1 ether);
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -int256(1 ether),
+            sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+        });
+        _swap(key, params, 0, "");
+
+        // check that the curator fees are updated
+        (feeRate, accruedFee0, accruedFee1) = bunniHook.getCuratorFees(id);
+        assertEq(feeRate, 100, "fee rate should be 100");
+        assertEq(accruedFee0, 0, "accrued fee 0 should be 0");
+        assertGt(accruedFee1, 0, "accrued fee 1 should be greater than 0");
+    }
 }

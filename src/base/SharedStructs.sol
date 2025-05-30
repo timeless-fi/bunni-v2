@@ -3,6 +3,7 @@
 pragma solidity >=0.6.0;
 pragma abicoder v2;
 
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolId, PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import {ERC4626} from "solady/tokens/ERC4626.sol";
@@ -98,6 +99,8 @@ struct DecodedHookParams {
 /// @member vaultSharePricesAtLastSwap The share prices of the vaults used by the pool at the last swap
 /// @member ldfStates The LDF state for a given pool ID
 /// @member slot0s The slot0 state for a given pool ID
+/// @member totalCuratorFees The total accumulated curator fees for a given currency
+/// @member curatorFees The accumulated curator fees & fee rate for a given pool ID
 struct HookStorage {
     mapping(PoolId => Oracle.Observation[MAX_CARDINALITY]) observations;
     mapping(PoolId => IBunniHook.ObservationState) states;
@@ -107,6 +110,8 @@ struct HookStorage {
     mapping(PoolId => VaultSharePrices) vaultSharePricesAtLastSwap;
     mapping(PoolId => bytes32) ldfStates;
     mapping(PoolId => Slot0) slot0s;
+    mapping(Currency => uint256) totalCuratorFees;
+    mapping(PoolId => CuratorFees) curatorFees;
 }
 
 /// @notice The slot0 state of a given pool
@@ -129,4 +134,14 @@ struct VaultSharePrices {
     bool initialized;
     uint120 sharePrice0;
     uint120 sharePrice1;
+}
+
+/// @notice The curator fee rate and fee amount accrued
+/// @member feeRate The curator fee rate, 5 decimals (e.g. 10000 corresponds to 10%)
+/// @member accruedFee0 The amount of currency0 accrued
+/// @member accruedFee1 The amount of currency1 accrued
+struct CuratorFees {
+    uint16 feeRate;
+    uint120 accruedFee0;
+    uint120 accruedFee1;
 }
