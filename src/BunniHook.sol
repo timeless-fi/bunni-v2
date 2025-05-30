@@ -13,6 +13,8 @@ import {AmAmm} from "biddog/AmAmm.sol";
 import "flood-contracts/src/interfaces/IZone.sol";
 import "flood-contracts/src/interfaces/IFloodPlain.sol";
 
+import {LibMulticaller} from "multicaller/LibMulticaller.sol";
+
 import {IERC1271} from "permit2/src/interfaces/IERC1271.sol";
 
 import {WETH} from "solady/tokens/WETH.sol";
@@ -194,7 +196,8 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     enum HookUnlockCallbackType {
         REBALANCE_PREHOOK,
         REBALANCE_POSTHOOK,
-        CLAIM_FEES
+        CLAIM_FEES,
+        CURATOR_CLAIM_FEES
     }
 
     /// @inheritdoc IUnlockCallback
@@ -208,6 +211,8 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
             _rebalancePosthookCallback(callbackData);
         } else if (t == HookUnlockCallbackType.CLAIM_FEES) {
             _claimFees(callbackData);
+        } else if (t == HookUnlockCallbackType.CURATOR_CLAIM_FEES) {
+            _curatorClaimFees(callbackData);
         }
         return bytes("");
     }
@@ -269,7 +274,8 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         for (uint256 i; i < currencyList.length; i++) {
             Currency currency = currencyList[i];
             // can claim balance - am-AMM accrued fees
-            uint256 balance = poolManager.balanceOf(address(this), currency.toId()) - _totalFees[currency];
+            uint256 balance = poolManager.balanceOf(address(this), currency.toId()) - _totalFees[currency]
+                - s.totalCuratorFees[currency];
             if (balance != 0) {
                 poolManager.burn(address(this), currency.toId(), balance);
                 if (currency.isAddressZero()) {
@@ -285,6 +291,33 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         }
 
         emit ClaimProtocolFees(currencyList, recipient);
+    }
+
+    function _curatorClaimFees(bytes memory callbackData) internal {
+        // decode data
+        (PoolKey memory key, address recipient) = abi.decode(callbackData, (PoolKey, address));
+        PoolId id = key.toId();
+
+        // reset fees
+        CuratorFees memory curatorFees = s.curatorFees[id];
+        uint256 feeAmount0 = curatorFees.accruedFee0;
+        uint256 feeAmount1 = curatorFees.accruedFee1;
+        delete s.curatorFees[id].accruedFee0;
+        delete s.curatorFees[id].accruedFee1;
+        s.totalCuratorFees[key.currency0] -= feeAmount0;
+        s.totalCuratorFees[key.currency1] -= feeAmount1;
+
+        // claim fees
+        if (feeAmount0 != 0) {
+            poolManager.burn(address(this), key.currency0.toId(), feeAmount0);
+            poolManager.take(key.currency0, recipient, feeAmount0);
+        }
+        if (feeAmount1 != 0) {
+            poolManager.burn(address(this), key.currency1.toId(), feeAmount1);
+            poolManager.take(key.currency1, recipient, feeAmount1);
+        }
+
+        emit CuratorClaimFees(id, recipient, feeAmount0, feeAmount1);
     }
 
     /// -----------------------------------------------------------------------
@@ -354,6 +387,33 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
             _pendingKActiveBlock = activeBlock;
         }
         emit ScheduleKChange(currentK, newK, activeBlock);
+    }
+
+    /// -----------------------------------------------------------------------
+    /// Curator functions
+    /// -----------------------------------------------------------------------
+
+    /// @inheritdoc IBunniHook
+    function curatorSetFeeRate(PoolId id, uint16 newFeeRate) external nonReentrant {
+        address msgSender = LibMulticaller.senderOrSigner();
+        IBunniToken bunniToken = hub.bunniTokenOfPool(id);
+        if (address(bunniToken) == address(0) || msgSender != bunniToken.owner()) revert BunniHook__Unauthorized();
+
+        s.curatorFees[id].feeRate = newFeeRate;
+
+        emit CuratorSetFeeRate(id, newFeeRate);
+    }
+
+    /// @inheritdoc IBunniHook
+    function curatorClaimFees(PoolKey calldata key, address recipient) external nonReentrant {
+        address msgSender = LibMulticaller.senderOrSigner();
+        PoolId id = key.toId();
+        IBunniToken bunniToken = hub.bunniTokenOfPool(id);
+        if (address(bunniToken) == address(0) || msgSender != bunniToken.owner()) revert BunniHook__Unauthorized();
+
+        // claim fees
+        bytes memory callbackData = abi.encode(key, recipient);
+        poolManager.unlock(abi.encode(HookUnlockCallbackType.CURATOR_CLAIM_FEES, callbackData));
     }
 
     /// -----------------------------------------------------------------------
@@ -445,8 +505,15 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         for (uint256 i; i < currencyList.length; i++) {
             // can claim balance - am-AMM accrued fees
             Currency currency = currencyList[i];
-            feeAmounts[i] = poolManager.balanceOf(address(this), currency.toId()) - _totalFees[currency];
+            feeAmounts[i] = poolManager.balanceOf(address(this), currency.toId()) - _totalFees[currency]
+                - s.totalCuratorFees[currency];
         }
+    }
+
+    /// @inheritdoc IBunniHook
+    function getCuratorFees(PoolId id) external view returns (uint16 feeRate, uint120 fee0, uint120 fee1) {
+        CuratorFees memory curatorFees = s.curatorFees[id];
+        return (curatorFees.feeRate, curatorFees.accruedFee0, curatorFees.accruedFee1);
     }
 
     /// -----------------------------------------------------------------------
