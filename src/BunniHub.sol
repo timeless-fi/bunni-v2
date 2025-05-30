@@ -11,6 +11,8 @@ import {IPoolManager, PoolKey} from "@uniswap/v4-core/src/interfaces/IPoolManage
 import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {TransientStateLibrary} from "@uniswap/v4-core/src/libraries/TransientStateLibrary.sol";
 
+import {LibMulticaller} from "multicaller/LibMulticaller.sol";
+
 import {WETH} from "solady/tokens/WETH.sol";
 import {SSTORE2} from "solady/utils/SSTORE2.sol";
 import {SafeCastLib} from "solady/utils/SafeCastLib.sol";
@@ -150,7 +152,54 @@ contract BunniHub is IBunniHub, Ownable, ReentrancyGuard {
 
     /// @inheritdoc IBunniHub
     function queueWithdraw(QueueWithdrawParams calldata params) external virtual override nonReentrant notPaused(1) {
-        BunniHubLogic.queueWithdraw(s, params);
+        /// -----------------------------------------------------------------------
+        /// Validation
+        /// -----------------------------------------------------------------------
+
+        PoolId id = params.poolKey.toId();
+        IBunniToken bunniToken = _getBunniTokenOfPool(id);
+        if (address(bunniToken) == address(0)) revert BunniHub__BunniTokenNotInitialized();
+
+        /// -----------------------------------------------------------------------
+        /// State updates
+        /// -----------------------------------------------------------------------
+
+        address msgSender = LibMulticaller.senderOrSigner();
+        QueuedWithdrawal memory queued = s.queuedWithdrawals[id][msgSender];
+
+        // update queued withdrawal
+        // use unchecked to get unlockTimestamp to overflow back to 0 if overflow occurs
+        // which is fine since we only care about relative time
+        uint56 blockTimestamp = uint56(block.timestamp);
+        uint56 newUnlockTimestamp;
+        unchecked {
+            newUnlockTimestamp = blockTimestamp + WITHDRAW_DELAY;
+        }
+        if (queued.shareAmount != 0) {
+            // requeue expired queued withdrawal
+            // if queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD overflows it's fine to requeue
+            // it's safe since the LP will still have to wait to withdraw
+            unchecked {
+                if (queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD >= blockTimestamp) {
+                    revert BunniHub__NoExpiredWithdrawal();
+                }
+            }
+            s.queuedWithdrawals[id][msgSender].unlockTimestamp = newUnlockTimestamp;
+        } else {
+            // create new queued withdrawal
+            if (params.shares == 0) revert BunniHub__ZeroInput();
+            s.queuedWithdrawals[id][msgSender] =
+                QueuedWithdrawal({shareAmount: params.shares, unlockTimestamp: newUnlockTimestamp});
+
+            /// -----------------------------------------------------------------------
+            /// External calls
+            /// -----------------------------------------------------------------------
+
+            // transfer shares from msgSender to address(this)
+            bunniToken.transferFrom(msgSender, address(this), params.shares);
+        }
+
+        emit QueueWithdraw(msgSender, id, params.shares);
     }
 
     /// @inheritdoc IBunniHub

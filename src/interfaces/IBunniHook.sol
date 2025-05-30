@@ -6,6 +6,7 @@ import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {IExtsload} from "@uniswap/v4-core/src/interfaces/IExtsload.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 
@@ -27,7 +28,7 @@ import {IBaseHook} from "./IBaseHook.sol";
 /// @author zefram.eth
 /// @notice Uniswap v4 hook responsible for handling swaps on Bunni. Implements auto-rebalancing
 /// executed via FloodPlain. Uses am-AMM to recapture LVR & MEV.
-interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
+interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm, IExtsload {
     /// -----------------------------------------------------------------------
     /// Events
     /// -----------------------------------------------------------------------
@@ -106,20 +107,6 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
     /// View functions
     /// -----------------------------------------------------------------------
 
-    /// @notice Returns the observation for the given pool key and observation index
-    /// @param key The pool key
-    /// @param index The observation index
-    /// @return observation The observation struct
-    function getObservation(PoolKey calldata key, uint256 index)
-        external
-        view
-        returns (Oracle.Observation memory observation);
-
-    /// @notice Returns the TWAP oracle observation state for the given pool key
-    /// @param key The pool key
-    /// @return state The state struct
-    function getState(PoolKey calldata key) external view returns (ObservationState memory state);
-
     /// @notice Observe the given pool for the timestamps
     /// @param key The pool key
     /// @param secondsAgos The timestamps to observe
@@ -150,16 +137,6 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
         view
         returns (uint160 sqrtPriceX96, int24 tick, uint32 lastSwapTimestamp, uint32 lastSurgeTimestamp);
 
-    /// @notice The share prices of the vaults used by the pool at the last swap
-    /// @param id The pool id
-    /// @return initialized True if the share prices have been initialized
-    /// @return sharePrice0 The underlying assets each share of vault0 represents, scaled by 1e18
-    /// @return sharePrice1 The underlying assets each share of vault1 represents, scaled by 1e18
-    function vaultSharePricesAtLastSwap(PoolId id)
-        external
-        view
-        returns (bool initialized, uint120 sharePrice0, uint120 sharePrice1);
-
     /// @notice Whether am-AMM is enabled for the given pool.
     function getAmAmmEnabled(PoolId id) external view returns (bool);
 
@@ -168,20 +145,6 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
     /// @param id The pool id
     /// @return Whether liquidity can be withdrawn from the given pool.
     function canWithdraw(PoolId id) external view returns (bool);
-
-    /// @notice Returns the hook protocol fee recipient
-    function getHookFeeRecipient() external view returns (address);
-
-    /// @notice Returns the modifiers for computing hook fee and referral reward
-    function getModifiers() external view returns (uint32 hookFeeModifier_, uint32 referralRewardModifier_);
-
-    /// @notice Returns the claimable hook fees for the given currencies
-    /// @param currencyList The list of currencies to claim fees for
-    /// @return feeAmounts The list of claimable fees for each currency
-    function getClaimableHookFees(Currency[] calldata currencyList)
-        external
-        view
-        returns (uint256[] memory feeAmounts);
 
     /// -----------------------------------------------------------------------
     /// External functions
@@ -198,7 +161,8 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
 
     /// @notice Claim protocol fees for the given currency list.
     /// @param currencyList The list of currencies to claim fees for
-    function claimProtocolFees(Currency[] calldata currencyList) external;
+    /// @return claimedAmounts The list of claimable fees for each currency
+    function claimProtocolFees(Currency[] calldata currencyList) external returns (uint256[] memory claimedAmounts);
 
     /// -----------------------------------------------------------------------
     /// BunniHub functions
@@ -241,13 +205,8 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm {
     /// Rebalance functions
     /// -----------------------------------------------------------------------
 
-    /// @notice Called by the FloodPlain contract prior to executing a rebalance order.
-    /// Should ensure the hook has exactly `hookArgs.preHookArgs.amount` tokens of `hookArgs.preHookArgs.currency` upon return.
+    /// @notice Called by the FloodPlain contract prior to and after executing a rebalance order.
+    /// Prehook should ensure the hook has at least `hookArgs.preHookArgs.amount` tokens of `hookArgs.preHookArgs.currency` upon return.
     /// @param hookArgs The rebalance order hook arguments
-    function rebalanceOrderPreHook(RebalanceOrderHookArgs calldata hookArgs) external;
-
-    /// @notice Called by the FloodPlain contract after executing a rebalance order.
-    /// Should transfer any output tokens from the order to BunniHub and update pool balances.
-    /// @param hookArgs The rebalance order hook arguments
-    function rebalanceOrderPostHook(RebalanceOrderHookArgs calldata hookArgs) external;
+    function rebalanceOrderHook(bool isPreHook, RebalanceOrderHookArgs calldata hookArgs) external;
 }

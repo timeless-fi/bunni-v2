@@ -4,11 +4,13 @@ pragma solidity ^0.8.4;
 import {Ownable} from "solady/auth/Ownable.sol";
 
 import "./BaseTest.sol";
+import {BunniStateLibrary} from "../src/lib/BunniStateLibrary.sol";
 
 contract BunniHookTest is BaseTest {
     using TickMath for *;
     using FullMathX96 for *;
     using SafeCastLib for *;
+    using BunniStateLibrary for *;
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
     using FixedPointMathLib for uint256;
@@ -450,17 +452,17 @@ contract BunniHookTest is BaseTest {
         assertGt(fee0, 0, "protocol fee0 not accrued");
         assertGt(fee1, 0, "protocol fee1 not accrued");
 
-        // check claimable fees
         Currency[] memory currencies = new Currency[](2);
         currencies[0] = key.currency0;
         currencies[1] = key.currency1;
-        uint256[] memory claimableAmounts = bunniHook.getClaimableHookFees(currencies);
-        assertEq(claimableAmounts[0], fee0, "claimable fee0 amount incorrect");
-        assertEq(claimableAmounts[1], fee1, "claimable fee1 amount incorrect");
 
         // collect fees
-        bunniHook.claimProtocolFees(currencies);
+        uint256[] memory claimedAmounts = bunniHook.claimProtocolFees(currencies);
         vm.snapshotGasLastCall(string.concat("collect protocol fees", snapLabel));
+
+        // check claimedAmounts correctness
+        assertEq(claimedAmounts[0], fee0, "claimedAmounts[0] incorrect");
+        assertEq(claimedAmounts[1], fee1, "claimedAmounts[1] incorrect");
 
         // check balances
         assertEq(
@@ -1133,13 +1135,13 @@ contract BunniHookTest is BaseTest {
         });
         assertEq(
             order.preHooks[0].data,
-            abi.encodeCall(IBunniHook.rebalanceOrderPreHook, (expectedHookArgs)),
+            abi.encodeCall(IBunniHook.rebalanceOrderHook, (true, expectedHookArgs)),
             "preHook data incorrect"
         );
         assertEq(order.postHooks[0].target, address(bunniHook), "postHook target not bunniHook");
         assertEq(
             order.postHooks[0].data,
-            abi.encodeCall(IBunniHook.rebalanceOrderPostHook, (expectedHookArgs)),
+            abi.encodeCall(IBunniHook.rebalanceOrderHook, (false, expectedHookArgs)),
             "postHook data incorrect"
         );
         assertEq(signedOrder.signature, abi.encode(key.toId()), "signature incorrect");
@@ -1300,13 +1302,13 @@ contract BunniHookTest is BaseTest {
         });
         assertEq(
             order.preHooks[0].data,
-            abi.encodeCall(IBunniHook.rebalanceOrderPreHook, (expectedHookArgs)),
+            abi.encodeCall(IBunniHook.rebalanceOrderHook, (true, expectedHookArgs)),
             "preHook data incorrect"
         );
         assertEq(order.postHooks[0].target, address(bunniHook), "postHook target not bunniHook");
         assertEq(
             order.postHooks[0].data,
-            abi.encodeCall(IBunniHook.rebalanceOrderPostHook, (expectedHookArgs)),
+            abi.encodeCall(IBunniHook.rebalanceOrderHook, (false, expectedHookArgs)),
             "postHook data incorrect"
         );
         assertEq(signedOrder.signature, abi.encode(key.toId()), "signature incorrect");
@@ -1755,7 +1757,8 @@ contract BunniHookTest is BaseTest {
     function test_protocolFeeSwitchBehavior() public {
         // initial hook fee recipient and fee modifier are zero
         assertEq(bunniHook.getHookFeeRecipient(), address(0), "hook fee recipient should be zero initially");
-        (uint32 hookFeeModifier_, uint32 referralRewardModifier_) = bunniHook.getModifiers();
+        uint32 hookFeeModifier_ = bunniHook.getHookFeeModifier();
+        uint32 referralRewardModifier_ = bunniHook.getReferralRewardModifier();
         assertEq(hookFeeModifier_, 0, "hook fee modifier should be zero initially");
         assertEq(referralRewardModifier_, 0, "referral reward modifier should be zero initially");
 
@@ -1775,7 +1778,8 @@ contract BunniHookTest is BaseTest {
 
         // can now change fee modifier
         bunniHook.setModifiers(HOOK_FEE_MODIFIER, REFERRAL_REWARD_MODIFIER);
-        (hookFeeModifier_, referralRewardModifier_) = bunniHook.getModifiers();
+        hookFeeModifier_ = bunniHook.getHookFeeModifier();
+        referralRewardModifier_ = bunniHook.getReferralRewardModifier();
         assertEq(hookFeeModifier_, HOOK_FEE_MODIFIER, "hook fee modifier should be set");
         assertEq(referralRewardModifier_, REFERRAL_REWARD_MODIFIER, "referral reward modifier should be set");
 
@@ -1793,7 +1797,8 @@ contract BunniHookTest is BaseTest {
 
         // can set hook fee modifier to different non-zero value after set
         bunniHook.setModifiers(HOOK_FEE_MODIFIER * 2, REFERRAL_REWARD_MODIFIER * 2);
-        (hookFeeModifier_, referralRewardModifier_) = bunniHook.getModifiers();
+        hookFeeModifier_ = bunniHook.getHookFeeModifier();
+        referralRewardModifier_ = bunniHook.getReferralRewardModifier();
         assertEq(hookFeeModifier_, HOOK_FEE_MODIFIER * 2, "hook fee modifier should be updated after set");
         assertEq(
             referralRewardModifier_,

@@ -402,57 +402,6 @@ library BunniHubLogic {
     /// Withdraw
     /// -----------------------------------------------------------------------
 
-    function queueWithdraw(HubStorage storage s, IBunniHub.QueueWithdrawParams calldata params) external {
-        /// -----------------------------------------------------------------------
-        /// Validation
-        /// -----------------------------------------------------------------------
-
-        PoolId id = params.poolKey.toId();
-        IBunniToken bunniToken = _getBunniTokenOfPool(s, id);
-        if (address(bunniToken) == address(0)) revert BunniHub__BunniTokenNotInitialized();
-
-        /// -----------------------------------------------------------------------
-        /// State updates
-        /// -----------------------------------------------------------------------
-
-        address msgSender = LibMulticaller.senderOrSigner();
-        QueuedWithdrawal memory queued = s.queuedWithdrawals[id][msgSender];
-
-        // update queued withdrawal
-        // use unchecked to get unlockTimestamp to overflow back to 0 if overflow occurs
-        // which is fine since we only care about relative time
-        uint56 blockTimestamp = uint56(block.timestamp);
-        uint56 newUnlockTimestamp;
-        unchecked {
-            newUnlockTimestamp = blockTimestamp + WITHDRAW_DELAY;
-        }
-        if (queued.shareAmount != 0) {
-            // requeue expired queued withdrawal
-            // if queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD overflows it's fine to requeue
-            // it's safe since the LP will still have to wait to withdraw
-            unchecked {
-                if (queued.unlockTimestamp + WITHDRAW_GRACE_PERIOD >= blockTimestamp) {
-                    revert BunniHub__NoExpiredWithdrawal();
-                }
-            }
-            s.queuedWithdrawals[id][msgSender].unlockTimestamp = newUnlockTimestamp;
-        } else {
-            // create new queued withdrawal
-            if (params.shares == 0) revert BunniHub__ZeroInput();
-            s.queuedWithdrawals[id][msgSender] =
-                QueuedWithdrawal({shareAmount: params.shares, unlockTimestamp: newUnlockTimestamp});
-
-            /// -----------------------------------------------------------------------
-            /// External calls
-            /// -----------------------------------------------------------------------
-
-            // transfer shares from msgSender to address(this)
-            bunniToken.transferFrom(msgSender, address(this), params.shares);
-        }
-
-        emit IBunniHub.QueueWithdraw(msgSender, id, params.shares);
-    }
-
     function withdraw(HubStorage storage s, Env calldata env, IBunniHub.WithdrawParams calldata params)
         external
         returns (uint256 amount0, uint256 amount1)

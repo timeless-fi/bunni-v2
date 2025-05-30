@@ -9,7 +9,7 @@ import "../interfaces/IBaseHook.sol";
 
 abstract contract BaseHook is IBaseHook {
     /// @notice The address of the pool manager
-    IPoolManager public immutable override poolManager;
+    IPoolManager internal immutable poolManager;
 
     constructor(IPoolManager _poolManager) {
         poolManager = _poolManager;

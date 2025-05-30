@@ -10,8 +10,6 @@ import {BeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 interface IBaseHook {
     error NotPoolManager();
 
-    function poolManager() external view returns (IPoolManager);
-
     /// @notice The hook called after the state of a pool is initialized
     /// @param sender The initial msg.sender for the initialize call
     /// @param key The key for the pool being initialized

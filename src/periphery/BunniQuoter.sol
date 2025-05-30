@@ -29,12 +29,14 @@ import {HookletLib} from "../lib/HookletLib.sol";
 import {FullMathX96} from "../lib/FullMathX96.sol";
 import {BunniHookLogic} from "../lib/BunniHookLogic.sol";
 import {LiquidityAmounts} from "../lib/LiquidityAmounts.sol";
+import {BunniStateLibrary} from "../lib/BunniStateLibrary.sol";
 
 contract BunniQuoter is IBunniQuoter {
     using TickMath for *;
     using SafeCastLib for *;
     using FullMathX96 for *;
     using FixedPointMathLib for *;
+    using BunniStateLibrary for *;
     using HookletLib for IHooklet;
     using PoolIdLibrary for PoolKey;
 
@@ -250,7 +252,7 @@ contract BunniQuoter is IBunniQuoter {
                 // instead of computing hook fees as a portion of the swap fee
                 // and deducting it, we compute hook fees separately using hookFeesBaseSwapFee
                 // and charge it as an extra fee on the swap
-                (uint32 hookFeeModifier,) = hook.getModifiers();
+                uint32 hookFeeModifier = hook.getHookFeeModifier();
                 uint256 hookFeesAmount =
                     outputAmount.mulDivUp(hookFeesBaseSwapFee, SWAP_FEE_BASE).mulDivUp(hookFeeModifier, MODIFIER_BASE);
                 // the case when swapFee = computeSurgeFee(lastSurgeTimestamp, hookParams.surgeFeeHalfLife)
@@ -281,7 +283,7 @@ contract BunniQuoter is IBunniQuoter {
                 // instead of computing hook fees as a portion of the swap fee
                 // and deducting it, we compute hook fees separately using hookFeesBaseSwapFee
                 // and charge it as an extra fee on the swap
-                (uint32 hookFeeModifier,) = hook.getModifiers();
+                uint32 hookFeeModifier = hook.getHookFeeModifier();
                 uint256 hookFeesAmount = inputAmount.mulDivUp(hookFeesBaseSwapFee, SWAP_FEE_BASE - hookFeesBaseSwapFee)
                     .mulDivUp(hookFeeModifier, MODIFIER_BASE);
                 swapFeeAmount += hookFeesAmount; // add hook fees to swapFeeAmount since we're only using it for computing inputAmount
@@ -768,7 +770,7 @@ contract BunniQuoter is IBunniQuoter {
         // compare with share prices at last swap to see if we need to apply the surge fee
         // surge fee is applied if the share price has increased by more than 1 / vaultSurgeThreshold
         (bool prevSharePricesInitialized, uint120 prevSharePrice0, uint120 prevSharePrice1) =
-            hook.vaultSharePricesAtLastSwap(id);
+            hook.getVaultSharePricesAtLastSwap(id);
         return (
             prevSharePricesInitialized
                 && (

@@ -40,8 +40,9 @@ contract BunniZone is IBunniZone, Ownable {
     /// @dev Only allows whitelisted fulfillers and am-AMM manager of the pool to fulfill orders.
     function validate(IFloodPlain.Order calldata order, address fulfiller) external view returns (bool) {
         // extract PoolKey from order's preHooks
+        // offset is 36 which is 4 bytes for function selector and 32 bytes for `bool isPreHook`
         IBunniHook.RebalanceOrderHookArgs memory hookArgs =
-            abi.decode(order.preHooks[0].data[4:], (IBunniHook.RebalanceOrderHookArgs));
+            abi.decode(order.preHooks[0].data[36:], (IBunniHook.RebalanceOrderHookArgs));
         PoolKey memory key = hookArgs.key;
         PoolId id = key.toId();
 

@@ -200,14 +200,14 @@ library RebalanceLogic {
         IFloodPlain.Hook[] memory preHooks = new IFloodPlain.Hook[](1);
         preHooks[0] = IFloodPlain.Hook({
             target: address(this),
-            data: abi.encodeCall(IBunniHook.rebalanceOrderPreHook, (hookArgs))
+            data: abi.encodeCall(IBunniHook.rebalanceOrderHook, (true, hookArgs))
         });
 
         // posthook should push output tokens from BunniHook to BunniHub and update pool balances
         IFloodPlain.Hook[] memory postHooks = new IFloodPlain.Hook[](1);
         postHooks[0] = IFloodPlain.Hook({
             target: address(this),
-            data: abi.encodeCall(IBunniHook.rebalanceOrderPostHook, (hookArgs))
+            data: abi.encodeCall(IBunniHook.rebalanceOrderHook, (false, hookArgs))
         });
 
         IFloodPlain.Order memory order = IFloodPlain.Order({

@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import "@uniswap/v4-core/src/types/PoolId.sol";
 import "@uniswap/v4-core/src/types/Currency.sol";
 import "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {Extsload} from "@uniswap/v4-core/src/Extsload.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -42,7 +43,7 @@ import {ReentrancyGuard} from "./base/ReentrancyGuard.sol";
 /// @author zefram.eth
 /// @notice Uniswap v4 hook responsible for handling swaps on Bunni. Implements auto-rebalancing
 /// executed via FloodPlain. Uses am-AMM to recapture LVR & MEV.
-contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
+contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm, Extsload {
     /// -----------------------------------------------------------------------
     /// Library usage
     /// -----------------------------------------------------------------------
@@ -63,10 +64,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     IBunniHub internal immutable hub;
     address internal immutable permit2;
     IFloodPlain internal immutable floodPlain;
-    /// @dev The address with the right to permanently set the hook fee recipient
-    address internal immutable hookFeeRecipientController;
-    /// @dev The Unix timestamp in seconds when this contract was deployed
-    uint256 internal immutable deployTimestamp;
 
     /// -----------------------------------------------------------------------
     /// Transient storage variables
@@ -111,6 +108,14 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// @dev Don't have to worry about overflow since it would take 4.63e34 years to occur (at 0.001ms block time)
     uint160 internal _pendingKActiveBlock;
 
+    /// @dev The address with the right to permanently set the hook fee recipient.
+    /// Immutable, but put in storage to reduce bytecode size.
+    address internal hookFeeRecipientController;
+
+    /// @dev The Unix timestamp in seconds when this contract was deployed.
+    /// Immutable, but put in storage to reduce bytecode size.
+    uint256 internal deployTimestamp;
+
     /// -----------------------------------------------------------------------
     /// Constructor
     /// -----------------------------------------------------------------------
@@ -129,7 +134,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         floodPlain = floodPlain_;
         permit2 = address(floodPlain_.PERMIT2());
         weth = weth_;
-        hookFeeRecipientController = hookFeeRecipientController_;
         require(
             address(hub_) != address(0) && address(floodPlain_) != address(0) && address(permit2) != address(0)
                 && address(weth_) != address(0) && hookFeeRecipientController_ != address(0) && owner_ != address(0)
@@ -138,11 +142,11 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
 
         floodZone = floodZone_;
         _K = k_;
+        deployTimestamp = block.timestamp;
+        hookFeeRecipientController = hookFeeRecipientController_;
 
         _initializeOwner(owner_);
         poolManager_.setOperator(address(hub_), true);
-
-        deployTimestamp = block.timestamp;
     }
 
     /// -----------------------------------------------------------------------
@@ -183,8 +187,15 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     }
 
     /// @inheritdoc IBunniHook
-    function claimProtocolFees(Currency[] calldata currencyList) external override nonReentrant {
-        poolManager.unlock(abi.encode(HookUnlockCallbackType.CLAIM_FEES, abi.encode(currencyList)));
+    function claimProtocolFees(Currency[] calldata currencyList)
+        external
+        override
+        nonReentrant
+        returns (uint256[] memory claimedAmounts)
+    {
+        return abi.decode(
+            poolManager.unlock(abi.encode(HookUnlockCallbackType.CLAIM_FEES, abi.encode(currencyList))), (uint256[])
+        );
     }
 
     receive() external payable {}
@@ -204,70 +215,73 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
         // decode input
         (HookUnlockCallbackType t, bytes memory callbackData) = abi.decode(data, (HookUnlockCallbackType, bytes));
 
-        if (t == HookUnlockCallbackType.REBALANCE_PREHOOK) {
-            _rebalancePrehookCallback(callbackData);
-        } else if (t == HookUnlockCallbackType.REBALANCE_POSTHOOK) {
-            _rebalancePosthookCallback(callbackData);
+        if (uint8(t) <= uint8(HookUnlockCallbackType.REBALANCE_POSTHOOK)) {
+            // rebalance prehook or posthook
+            _rebalanceHookCallback(t == HookUnlockCallbackType.REBALANCE_PREHOOK, callbackData);
         } else if (t == HookUnlockCallbackType.CLAIM_FEES) {
-            _claimFees(callbackData);
+            // claim protocol fees
+            return _claimFees(callbackData);
         }
         return bytes("");
     }
 
-    /// @dev Calls hub.hookHandleSwap to pull the rebalance swap input tokens from BunniHub.
+    /// @dev Prehook calls hub.hookHandleSwap to pull the rebalance swap input tokens from BunniHub.
     /// Then burns PoolManager claim tokens and takes the underlying tokens from PoolManager.
-    /// Used while executing rebalance orders.
-    function _rebalancePrehookCallback(bytes memory callbackData) internal {
-        // decode data
-        (Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne) =
-            abi.decode(callbackData, (Currency, uint256, PoolKey, bool));
-
-        // pull claim tokens from BunniHub
-        hub.hookHandleSwap({key: key, zeroForOne: zeroForOne, inputAmount: 0, outputAmount: amount, shouldSurge: false});
-
-        // lock BunniHub to prevent reentrancy
-        hub.lockForRebalance(key);
-
-        // burn and take
-        poolManager.burn(address(this), currency.toId(), amount);
-        poolManager.take(currency, address(this), amount);
-
-        // approve input token to permit2
-        ERC20 token = currency.isAddressZero() ? weth : ERC20(Currency.unwrap(currency));
-        if (token.allowance(address(this), permit2) < amount) {
-            address(token).safeApproveWithRetry(permit2, amount);
-        }
-    }
-
-    /// @dev Settles tokens sent to PoolManager and mints the corresponding claim tokens.
+    /// Posthook Settles tokens sent to PoolManager and mints the corresponding claim tokens.
     /// Then calls hub.hookGive to update pool balances with rebalance swap output.
     /// Used while executing rebalance orders.
-    function _rebalancePosthookCallback(bytes memory callbackData) internal {
+    function _rebalanceHookCallback(bool isPreHook, bytes memory callbackData) internal {
         // decode data
         (Currency currency, uint256 amount, PoolKey memory key, bool zeroForOne) =
             abi.decode(callbackData, (Currency, uint256, PoolKey, bool));
 
-        // sync poolManager balance and transfer the output tokens to poolManager
-        poolManager.sync(currency);
-        if (!currency.isAddressZero()) {
-            Currency.unwrap(currency).safeTransfer(address(poolManager), amount);
+        if (isPreHook) {
+            // pull claim tokens from BunniHub
+            hub.hookHandleSwap({
+                key: key,
+                zeroForOne: zeroForOne,
+                inputAmount: 0,
+                outputAmount: amount,
+                shouldSurge: false
+            });
+
+            // lock BunniHub to prevent reentrancy
+            hub.lockForRebalance(key);
+
+            // burn and take
+            poolManager.burn(address(this), currency.toId(), amount);
+            poolManager.take(currency, address(this), amount);
+
+            // approve input token to permit2
+            ERC20 token = currency.isAddressZero() ? weth : ERC20(Currency.unwrap(currency));
+            if (token.allowance(address(this), permit2) < amount) {
+                address(token).safeApproveWithRetry(permit2, amount);
+            }
+        } else {
+            // sync poolManager balance and transfer the output tokens to poolManager
+            poolManager.sync(currency);
+            if (!currency.isAddressZero()) {
+                Currency.unwrap(currency).safeTransfer(address(poolManager), amount);
+            }
+
+            // settle the transferred tokens and mint claim tokens
+            uint256 paid = poolManager.settle{value: currency.isAddressZero() ? amount : 0}();
+            poolManager.mint(address(this), currency.toId(), paid);
+
+            // push claim tokens to BunniHub
+            hub.hookGive({key: key, isCurrency0: zeroForOne, amount: paid});
         }
-
-        // settle the transferred tokens and mint claim tokens
-        uint256 paid = poolManager.settle{value: currency.isAddressZero() ? amount : 0}();
-        poolManager.mint(address(this), currency.toId(), paid);
-
-        // push claim tokens to BunniHub
-        hub.hookGive({key: key, isCurrency0: zeroForOne, amount: paid});
     }
 
     /// @dev Claims protocol fees earned and sends it to the recipient.
-    function _claimFees(bytes memory callbackData) internal {
+    function _claimFees(bytes memory callbackData) internal returns (bytes memory) {
         // decode data
         Currency[] memory currencyList = abi.decode(callbackData, (Currency[]));
         address recipient = hookFeeRecipient;
 
         if (recipient == address(0)) revert BunniHook__HookFeeRecipientNotSet();
+
+        uint256[] memory claimedAmounts = new uint256[](currencyList.length);
 
         // claim protocol fees
         for (uint256 i; i < currencyList.length; i++) {
@@ -285,10 +299,13 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
                     // take tokens directly to recipient
                     poolManager.take(currency, recipient, balance);
                 }
+                claimedAmounts[i] = balance;
             }
         }
 
         emit ClaimProtocolFees(currencyList, recipient);
+
+        return abi.encode(claimedAmounts);
     }
 
     /// -----------------------------------------------------------------------
@@ -387,21 +404,6 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// -----------------------------------------------------------------------
 
     /// @inheritdoc IBunniHook
-    function getObservation(PoolKey calldata key, uint256 index)
-        external
-        view
-        override
-        returns (Oracle.Observation memory observation)
-    {
-        observation = s.observations[key.toId()][index];
-    }
-
-    /// @inheritdoc IBunniHook
-    function getState(PoolKey calldata key) external view override returns (ObservationState memory state) {
-        state = s.states[key.toId()];
-    }
-
-    /// @inheritdoc IBunniHook
     function observe(PoolKey calldata key, uint32[] calldata secondsAgos)
         external
         view
@@ -437,42 +439,8 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     }
 
     /// @inheritdoc IBunniHook
-    function vaultSharePricesAtLastSwap(PoolId id)
-        external
-        view
-        returns (bool initialized, uint120 sharePrice0, uint120 sharePrice1)
-    {
-        VaultSharePrices memory prices = s.vaultSharePricesAtLastSwap[id];
-        return (prices.initialized, prices.sharePrice0, prices.sharePrice1);
-    }
-
-    /// @inheritdoc IBunniHook
     function canWithdraw(PoolId id) external view returns (bool) {
         return block.timestamp > s.rebalanceOrderDeadline[id] || withdrawalUnblocked[id];
-    }
-
-    /// @inheritdoc IBunniHook
-    function getHookFeeRecipient() external view returns (address) {
-        return hookFeeRecipient;
-    }
-
-    /// @inheritdoc IBunniHook
-    function getModifiers() external view returns (uint32 hookFeeModifier_, uint32 referralRewardModifier_) {
-        return (hookFeeModifier, referralRewardModifier);
-    }
-
-    /// @inheritdoc IBunniHook
-    function getClaimableHookFees(Currency[] calldata currencyList)
-        external
-        view
-        returns (uint256[] memory feeAmounts)
-    {
-        feeAmounts = new uint256[](currencyList.length);
-        for (uint256 i; i < currencyList.length; i++) {
-            // can claim balance - am-AMM accrued fees
-            Currency currency = currencyList[i];
-            feeAmounts[i] = poolManager.balanceOf(address(this), currency.toId()) - _totalFees[currency];
-        }
     }
 
     /// -----------------------------------------------------------------------
@@ -534,7 +502,7 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
     /// -----------------------------------------------------------------------
 
     /// @inheritdoc IBunniHook
-    function rebalanceOrderPreHook(RebalanceOrderHookArgs calldata hookArgs) external override nonReentrant {
+    function rebalanceOrderHook(bool isPreHook, RebalanceOrderHookArgs calldata hookArgs) external override {
         // verify call came from Flood
         if (msg.sender != address(floodPlain)) {
             revert BunniHook__Unauthorized();
@@ -553,113 +521,94 @@ contract BunniHook is BaseHook, Ownable, IBunniHook, ReentrancyGuard, AmAmm {
             revert BunniHook__InvalidRebalanceOrderHash();
         }
 
-        RebalanceOrderPreHookArgs calldata args = hookArgs.preHookArgs;
+        if (isPreHook) {
+            RebalanceOrderPreHookArgs calldata args = hookArgs.preHookArgs;
 
-        // cache the order input balance before the order execution
-        uint256 inputBalanceBefore =
-            args.currency.isAddressZero() ? weth.balanceOf(address(this)) : args.currency.balanceOfSelf();
+            // cache the order input balance before the order execution
+            uint256 inputBalanceBefore =
+                args.currency.isAddressZero() ? weth.balanceOf(address(this)) : args.currency.balanceOfSelf();
 
-        // store the order output balance before the order execution in transient storage
-        // this is used to compute the order output amount
-        uint256 outputBalanceBefore = hookArgs.postHookArgs.currency.isAddressZero()
-            ? weth.balanceOf(address(this))
-            : hookArgs.postHookArgs.currency.balanceOfSelf();
-        assembly ("memory-safe") {
-            tstore(REBALANCE_OUTPUT_BALANCE_SLOT, outputBalanceBefore)
-        }
+            // store the order output balance before the order execution in transient storage
+            // this is used to compute the order output amount
+            uint256 outputBalanceBefore = hookArgs.postHookArgs.currency.isAddressZero()
+                ? weth.balanceOf(address(this))
+                : hookArgs.postHookArgs.currency.balanceOfSelf();
+            assembly ("memory-safe") {
+                tstore(REBALANCE_OUTPUT_BALANCE_SLOT, outputBalanceBefore)
+            }
 
-        // pull input tokens from BunniHub to BunniHook
-        // received in the form of PoolManager claim tokens
-        // then unwrap claim tokens
-        poolManager.unlock(
-            abi.encode(
-                HookUnlockCallbackType.REBALANCE_PREHOOK,
-                abi.encode(args.currency, args.amount, hookArgs.key, hookArgs.key.currency1 == args.currency)
-            )
-        );
+            // pull input tokens from BunniHub to BunniHook
+            // received in the form of PoolManager claim tokens
+            // then unwrap claim tokens
+            poolManager.unlock(
+                abi.encode(
+                    HookUnlockCallbackType.REBALANCE_PREHOOK,
+                    abi.encode(args.currency, args.amount, hookArgs.key, hookArgs.key.currency1 == args.currency)
+                )
+            );
 
-        // ensure we received at least args.amount tokens so that there is enough input for the order
-        if (args.currency.balanceOfSelf() - inputBalanceBefore < args.amount) {
-            revert BunniHook__PrehookPostConditionFailed();
-        }
+            // ensure we received at least args.amount tokens so that there is enough input for the order
+            if (args.currency.balanceOfSelf() - inputBalanceBefore < args.amount) {
+                revert BunniHook__PrehookPostConditionFailed();
+            }
 
-        // wrap native ETH input to WETH
-        // we're implicitly trusting the WETH contract won't charge a fee which is OK in practice
-        if (args.currency.isAddressZero()) {
-            weth.deposit{value: args.amount}();
-        }
-    }
-
-    /// @inheritdoc IBunniHook
-    function rebalanceOrderPostHook(RebalanceOrderHookArgs calldata hookArgs) external override nonReentrant {
-        // verify call came from Flood
-        if (msg.sender != address(floodPlain)) {
-            revert BunniHook__Unauthorized();
-        }
-
-        PoolId id = hookArgs.key.toId();
-
-        // verify the order hash originated from BunniHook
-        // this also verifies hookArgs is valid since it's hashed into the order hash
-        bytes32 orderHash;
-        // orderHash = bytes32(msg.data[msg.data.length - 32:msg.data.length]);
-        assembly ("memory-safe") {
-            orderHash := calldataload(sub(calldatasize(), 32))
-        }
-        if (s.rebalanceOrderHash[id] != orderHash) {
-            revert BunniHook__InvalidRebalanceOrderHash();
-        }
-
-        // invalidate the rebalance order
-        delete s.rebalanceOrderHash[id];
-        delete s.rebalanceOrderPermit2Hash[id];
-        delete s.rebalanceOrderDeadline[id];
-
-        // surge fee should be applied after the rebalance has been executed
-        // since totalLiquidity will be increased
-        // no need to check surgeFeeAutostartThreshold since we just increased the liquidity in this tx
-        // so block.timestamp is the exact time when the surge should occur
-        s.slot0s[id].lastSwapTimestamp = uint32(block.timestamp);
-        s.slot0s[id].lastSurgeTimestamp = uint32(block.timestamp);
-
-        RebalanceOrderPostHookArgs calldata args = hookArgs.postHookArgs;
-
-        // compute order output amount by computing the difference in the output token balance
-        uint256 orderOutputAmount;
-        uint256 outputBalanceBefore;
-        assembly ("memory-safe") {
-            outputBalanceBefore := tload(REBALANCE_OUTPUT_BALANCE_SLOT)
-        }
-        if (args.currency.isAddressZero()) {
-            // unwrap WETH output to native ETH
-            orderOutputAmount = weth.balanceOf(address(this));
-            weth.withdraw(orderOutputAmount);
+            // wrap native ETH input to WETH
+            // we're implicitly trusting the WETH contract won't charge a fee which is OK in practice
+            if (args.currency.isAddressZero()) {
+                weth.deposit{value: args.amount}();
+            }
         } else {
-            orderOutputAmount = args.currency.balanceOfSelf();
-        }
-        orderOutputAmount -= outputBalanceBefore;
+            // invalidate the rebalance order
+            delete s.rebalanceOrderHash[id];
+            delete s.rebalanceOrderPermit2Hash[id];
+            delete s.rebalanceOrderDeadline[id];
 
-        // posthook should wrap output tokens as claim tokens and push it from BunniHook to BunniHub and update pool balances
-        poolManager.unlock(
-            abi.encode(
-                HookUnlockCallbackType.REBALANCE_POSTHOOK,
-                abi.encode(args.currency, orderOutputAmount, hookArgs.key, hookArgs.key.currency0 == args.currency)
-            )
-        );
+            // surge fee should be applied after the rebalance has been executed
+            // since totalLiquidity will be increased
+            // no need to check surgeFeeAutostartThreshold since we just increased the liquidity in this tx
+            // so block.timestamp is the exact time when the surge should occur
+            s.slot0s[id].lastSwapTimestamp = uint32(block.timestamp);
+            s.slot0s[id].lastSurgeTimestamp = uint32(block.timestamp);
 
-        // recompute idle balance
-        BunniHookLogic.recomputeIdleBalance(s, hub, hookArgs.key);
+            RebalanceOrderPostHookArgs calldata args = hookArgs.postHookArgs;
 
-        // call hooklet
-        IHooklet hooklet = hub.hookletOfPool(id);
-        if (hooklet.hasPermission(HookletLib.AFTER_SWAP_FLAG)) {
-            hooklet.hookletAfterRebalance({
-                sender: msg.sender,
-                key: hookArgs.key,
-                zeroForOne: hookArgs.key.currency0 == args.currency,
-                orderInputAmount: hookArgs.preHookArgs.amount,
-                orderOutputAmount: orderOutputAmount
-            });
+            // compute order output amount by computing the difference in the output token balance
+            uint256 orderOutputAmount;
+            uint256 outputBalanceBefore;
+            assembly ("memory-safe") {
+                outputBalanceBefore := tload(REBALANCE_OUTPUT_BALANCE_SLOT)
+            }
+            if (args.currency.isAddressZero()) {
+                // unwrap WETH output to native ETH
+                orderOutputAmount = weth.balanceOf(address(this));
+                weth.withdraw(orderOutputAmount);
+            } else {
+                orderOutputAmount = args.currency.balanceOfSelf();
+            }
+            orderOutputAmount -= outputBalanceBefore;
+
+            // posthook should wrap output tokens as claim tokens and push it from BunniHook to BunniHub and update pool balances
+            poolManager.unlock(
+                abi.encode(
+                    HookUnlockCallbackType.REBALANCE_POSTHOOK,
+                    abi.encode(args.currency, orderOutputAmount, hookArgs.key, hookArgs.key.currency0 == args.currency)
+                )
+            );
+
+            // recompute idle balance
+            BunniHookLogic.recomputeIdleBalance(s, hub, hookArgs.key);
+
+            // call hooklet
+            IHooklet hooklet = hub.hookletOfPool(id);
+            if (hooklet.hasPermission(HookletLib.AFTER_SWAP_FLAG)) {
+                hooklet.hookletAfterRebalance({
+                    sender: msg.sender,
+                    key: hookArgs.key,
+                    zeroForOne: hookArgs.key.currency0 == args.currency,
+                    orderInputAmount: hookArgs.preHookArgs.amount,
+                    orderOutputAmount: orderOutputAmount
+                });
+            }
         }
     }
 
