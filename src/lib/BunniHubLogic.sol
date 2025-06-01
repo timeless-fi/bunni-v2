@@ -197,13 +197,7 @@ library BunniHubLogic {
 
         // mint shares using actual token amounts
         shares = _mintShares(
-            msgSender,
-            state.bunniToken,
-            params.recipient,
-            amount0,
-            depositReturnData.balance0,
-            amount1,
-            depositReturnData.balance1
+            state.bunniToken, params.recipient, amount0, depositReturnData.balance0, amount1, depositReturnData.balance1
         );
 
         if (depositReturnData.balance0 == 0 && depositReturnData.balance1 == 0) {
@@ -708,7 +702,6 @@ library BunniHubLogic {
     /// -----------------------------------------------------------------------
 
     /// @notice Mints share tokens to the recipient based on the amount of liquidity added.
-    /// @param msgSender The msg.sender of the transaction
     /// @param shareToken The BunniToken to mint
     /// @param recipient The recipient of the share tokens
     /// @param addedAmount0 The amount of token0 added to the pool
@@ -717,7 +710,6 @@ library BunniHubLogic {
     /// @param existingAmount1 The existing amount of token1 in the pool
     /// @return shares The amount of share tokens minted to the sender.
     function _mintShares(
-        address msgSender,
         IBunniToken shareToken,
         address recipient,
         uint256 addedAmount0,

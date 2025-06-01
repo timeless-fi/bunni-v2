@@ -1813,4 +1813,134 @@ contract BunniHookTest is BaseTest {
         vm.expectRevert(BunniHook__HookFeeRecipientNotSet.selector);
         bunniHook.claimProtocolFees(new Currency[](0));
     }
+
+    function test_curatorFees_happyPath(uint16 feeRate) public {
+        vm.assume(feeRate != 0);
+
+        // set hook fee recipient
+        vm.prank(HOOK_FEE_RECIPIENT_CONTROLLER);
+        bunniHook.setHookFeeRecipient(HOOK_FEE_RECIPIENT);
+
+        // activate hook fees
+        bunniHook.setHookFeeModifier(HOOK_FEE_MODIFIER);
+
+        // create new bunni token
+        (Currency currency0, Currency currency1) = (Currency.wrap(address(token0)), Currency.wrap(address(token1)));
+        (, PoolKey memory key) =
+            _deployPoolAndInitLiquidity(currency0, currency1, ERC4626(address(0)), ERC4626(address(0)));
+
+        // set fee rate
+        bunniHook.curatorSetFeeRate(key.toId(), feeRate);
+
+        // make a swap
+        // exactIn == true, zeroForOne == true, thus fee will be in token1
+        _mint(key.currency0, address(this), 1 ether);
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -int256(1 ether),
+            sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+        });
+        _swap(key, params, 0, "");
+
+        // fetch claim token balance of hook
+        uint256 hookBalanceBefore = poolManager.balanceOf(address(bunniHook), key.currency1.toId());
+
+        // check that the curator fees are updated
+        (uint16 feeRate_, uint120 accruedFee0, uint120 accruedFee1) = bunniHook.getCuratorFees(key.toId());
+        assertEq(feeRate_, feeRate, "fee rate should be set");
+        assertEq(accruedFee0, 0, "accrued fee 0 should be 0");
+        assertGt(accruedFee1, 0, "accrued fee 1 should be greater than 0");
+
+        // claim fees
+        address recipient = address(0xb0bb0b);
+        bunniHook.curatorClaimFees(key, recipient);
+
+        // check that the curator received the fees
+        assertEq(currency1.balanceOf(recipient), accruedFee1, "curator should have received fees");
+
+        // check that the hook's claim token balance has decreased
+        assertEq(
+            poolManager.balanceOf(address(bunniHook), key.currency1.toId()),
+            hookBalanceBefore - accruedFee1,
+            "hook's claim token balance should have decreased"
+        );
+
+        // check that the curator fees are reset
+        (feeRate_, accruedFee0, accruedFee1) = bunniHook.getCuratorFees(key.toId());
+        assertEq(feeRate_, feeRate, "fee rate should be set");
+        assertEq(accruedFee0, 0, "accrued fee 0 should be 0");
+        assertEq(accruedFee1, 0, "accrued fee 1 should be 0");
+
+        // claim protocol fees
+        Currency[] memory currencies = new Currency[](1);
+        currencies[0] = key.currency1;
+        uint256[] memory claimedAmounts = bunniHook.claimProtocolFees(currencies);
+
+        // check that the hook fee recipient received the fees
+        assertEq(
+            currency1.balanceOf(HOOK_FEE_RECIPIENT), claimedAmounts[0], "hook fee recipient should have received fees"
+        );
+
+        // check that the hook's claim token balance is zero
+        assertEq(
+            poolManager.balanceOf(address(bunniHook), key.currency1.toId()),
+            0,
+            "hook's claim token balance should be zero"
+        );
+    }
+
+    function test_curatorFees_authChecks(uint16 feeRate) public {
+        vm.assume(feeRate != 0);
+
+        // create new bunni token
+        (Currency currency0, Currency currency1) = (Currency.wrap(address(token0)), Currency.wrap(address(token1)));
+        (IBunniToken bunniToken, PoolKey memory key) =
+            _deployPoolAndInitLiquidity(currency0, currency1, ERC4626(address(0)), ERC4626(address(0)));
+
+        // transfer bunni token ownership to new curator
+        address curator = address(0xabcd);
+        bunniToken.transferOwnership(curator);
+
+        // set fee rate
+        vm.prank(curator);
+        bunniHook.curatorSetFeeRate(key.toId(), feeRate);
+
+        // check fee rate
+        (uint16 feeRate_,,) = bunniHook.getCuratorFees(key.toId());
+        assertEq(feeRate_, feeRate, "fee rate should be set");
+
+        // only curator can set fee rate
+        vm.expectRevert(BunniHook__Unauthorized.selector);
+        vm.prank(address(0x1234));
+        bunniHook.curatorSetFeeRate(key.toId(), feeRate);
+
+        // make swap
+        _mint(key.currency0, address(this), 1 ether);
+        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+            zeroForOne: true,
+            amountSpecified: -int256(1 ether),
+            sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+        });
+        _swap(key, params, 0, "");
+
+        (uint16 feeRate__, uint120 accruedFee0, uint120 accruedFee1) = bunniHook.getCuratorFees(key.toId());
+
+        // only curator can claim fees
+        vm.expectRevert(BunniHook__Unauthorized.selector);
+        vm.prank(address(0x1234));
+        bunniHook.curatorClaimFees(key, curator);
+
+        // claim fees
+        vm.prank(curator);
+        bunniHook.curatorClaimFees(key, curator);
+
+        // check that the curator received the fees
+        assertEq(currency1.balanceOf(curator), accruedFee1, "curator should have received fees");
+
+        // check that the state has been updated
+        (feeRate__, accruedFee0, accruedFee1) = bunniHook.getCuratorFees(key.toId());
+        assertEq(feeRate__, feeRate, "fee rate should be set");
+        assertEq(accruedFee0, 0, "accrued fee 0 should be 0");
+        assertEq(accruedFee1, 0, "accrued fee 1 should be 0");
+    }
 }
