@@ -625,7 +625,7 @@ library BunniHookLogic {
                     )
                         || (
                             p.rebalanceThreshold != 0 && p.rebalanceMaxSlippage != 0
-                                && p.rebalanceMaxSlippage < REBALANCE_MAX_SLIPPAGE_BASE && p.rebalanceTwapSecondsAgo != 0
+                                && p.rebalanceMaxSlippage < MAX_REBALANCE_MAX_SLIPPAGE && p.rebalanceTwapSecondsAgo != 0
                                 && p.rebalanceTwapSecondsAgo < MAX_REBALANCE_TWAP_SECONDS_AGO && p.rebalanceOrderTTL != 0
                                 && p.rebalanceOrderTTL < MAX_REBALANCE_ORDER_TTL
                         )

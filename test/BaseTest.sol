@@ -95,13 +95,13 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
     address internal constant HOOK_FEE_RECIPIENT = address(0xfee);
     address internal constant HOOK_FEE_RECIPIENT_CONTROLLER = address(0xf00d);
     uint24 internal constant TWAP_SECONDS_AGO = 1 days;
-    uint16 internal constant SURGE_HALFLIFE = 1 minutes;
+    uint16 internal constant SURGE_HALFLIFE = 36 seconds;
     uint16 internal constant SURGE_AUTOSTART_TIME = 2 minutes;
     uint16 internal constant VAULT_SURGE_THRESHOLD_0 = 1e4; // 0.01% change in share price
     uint16 internal constant VAULT_SURGE_THRESHOLD_1 = 1e3; // 0.1% change in share price
     uint256 internal constant VAULT_FEE = 0.03e18;
     uint16 internal constant REBALANCE_THRESHOLD = 100; // 1 / 100 = 1%
-    uint16 internal constant REBALANCE_MAX_SLIPPAGE = 1; // 5%
+    uint16 internal constant REBALANCE_MAX_SLIPPAGE = 0.05e5; // 5%
     uint16 internal constant REBALANCE_TWAP_SECONDS_AGO = 1 hours;
     uint16 internal constant REBALANCE_ORDER_TTL = 10 minutes;
     uint32 internal constant ORACLE_MIN_INTERVAL = 1 hours;
