@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
+import {SafeCastLib} from "solady/utils/SafeCastLib.sol";
+import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
-import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 import {UnsafeMath} from "@uniswap/v4-core/src/libraries/UnsafeMath.sol";
 import {FixedPoint96} from "@uniswap/v4-core/src/libraries/FixedPoint96.sol";
 
 /// @title Functions based on Q64.96 sqrt price and liquidity
 /// @notice Contains the math that uses square root of price as a Q64.96 and liquidity to compute deltas
 library SqrtPriceMath {
-    using SafeCast for uint256;
+    using SafeCastLib for uint256;
 
     error InvalidPriceOrLiquidity();
     error InvalidPrice();
@@ -44,7 +44,7 @@ library SqrtPriceMath {
                     uint256 denominator = numerator1 + product;
                     if (denominator >= numerator1) {
                         // always fits in 160 bits
-                        return uint160(FullMath.mulDivRoundingUp(numerator1, sqrtPX96, denominator));
+                        return uint160(FixedPointMathLib.fullMulDivUp(numerator1, sqrtPX96, denominator));
                     }
                 }
             }
@@ -68,7 +68,7 @@ library SqrtPriceMath {
                     }
                 }
                 uint256 denominator = numerator1 - product;
-                return FullMath.mulDivRoundingUp(numerator1, sqrtPX96, denominator).toUint160();
+                return FixedPointMathLib.fullMulDivUp(numerator1, sqrtPX96, denominator).toUint160();
             }
         }
     }
@@ -94,7 +94,7 @@ library SqrtPriceMath {
             uint256 quotient = (
                 amount <= type(uint160).max
                     ? (amount << FixedPoint96.RESOLUTION) / liquidity
-                    : FullMath.mulDiv(amount, FixedPoint96.Q96, liquidity)
+                    : FixedPointMathLib.fullMulDiv(amount, FixedPoint96.Q96, liquidity)
             );
 
             return (uint256(sqrtPX96) + quotient).toUint160();
@@ -102,7 +102,7 @@ library SqrtPriceMath {
             uint256 quotient = (
                 amount <= type(uint160).max
                     ? UnsafeMath.divRoundingUp(amount << FixedPoint96.RESOLUTION, liquidity)
-                    : FullMath.mulDivRoundingUp(amount, FixedPoint96.Q96, liquidity)
+                    : FixedPointMathLib.fullMulDivUp(amount, FixedPoint96.Q96, liquidity)
             );
 
             // equivalent: if (sqrtPX96 <= quotient) revert NotEnoughLiquidity();
@@ -202,8 +202,10 @@ library SqrtPriceMath {
             uint256 numerator2 = sqrtPriceBX96 - sqrtPriceAX96;
 
             return roundUp
-                ? UnsafeMath.divRoundingUp(FullMath.mulDivRoundingUp(numerator1, numerator2, sqrtPriceBX96), sqrtPriceAX96)
-                : FullMath.mulDiv(numerator1, numerator2, sqrtPriceBX96) / sqrtPriceAX96;
+                ? UnsafeMath.divRoundingUp(
+                    FixedPointMathLib.fullMulDivUp(numerator1, numerator2, sqrtPriceBX96), sqrtPriceAX96
+                )
+                : FixedPointMathLib.fullMulDiv(numerator1, numerator2, sqrtPriceBX96) / sqrtPriceAX96;
         }
     }
 
@@ -240,11 +242,11 @@ library SqrtPriceMath {
         /**
          * Equivalent to:
          *   amount1 = roundUp
-         *       ? FullMath.mulDivRoundingUp(liquidity, sqrtPriceBX96 - sqrtPriceAX96, FixedPoint96.Q96)
-         *       : FullMath.mulDiv(liquidity, sqrtPriceBX96 - sqrtPriceAX96, FixedPoint96.Q96);
+         *       ? FixedPointMathLib.fullMulDivUp(liquidity, sqrtPriceBX96 - sqrtPriceAX96, FixedPoint96.Q96)
+         *       : FixedPointMathLib.fullMulDiv(liquidity, sqrtPriceBX96 - sqrtPriceAX96, FixedPoint96.Q96);
          * Cannot overflow because `type(uint128).max * type(uint160).max >> 96 < (1 << 192)`.
          */
-        amount1 = FullMath.mulDiv(_liquidity, numerator, denominator);
+        amount1 = FixedPointMathLib.fullMulDiv(_liquidity, numerator, denominator);
         assembly ("memory-safe") {
             amount1 := add(amount1, and(gt(mulmod(_liquidity, numerator, denominator), 0), roundUp))
         }

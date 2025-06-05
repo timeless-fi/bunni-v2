@@ -50,9 +50,7 @@ contract DeployCoreScript is CREATE3Script {
                     hubSalt,
                     bytes.concat(
                         type(BunniHub).creationCode,
-                        abi.encode(
-                            poolManager, weth, vm.envAddress("PERMIT2"), new BunniToken(), owner, owner, hookWhitelist
-                        )
+                        abi.encode(poolManager, weth, vm.envAddress("PERMIT2"), new BunniToken(), owner, hookWhitelist)
                     )
                 )
             )

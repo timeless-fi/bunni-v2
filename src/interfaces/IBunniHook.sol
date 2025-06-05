@@ -57,10 +57,12 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm, 
     );
     event SetZone(IZone zone);
     event SetHookFeeRecipient(address hookFeeRecipient);
-    event SetModifiers(uint32 indexed hookFeeModifier, uint32 indexed referrerRewardModifier);
+    event SetHookFeeModifier(uint32 indexed hookFeeModifier);
     event SetWithdrawalUnblocked(PoolId indexed id, bool unblocked);
     event ScheduleKChange(uint48 currentK, uint48 indexed newK, uint160 indexed activeBlock);
     event ClaimProtocolFees(Currency[] currencyList, address indexed recipient);
+    event CuratorSetFeeRate(PoolId indexed id, uint16 indexed newFeeRate);
+    event CuratorClaimFees(PoolId indexed id, address indexed recipient, uint256 feeAmount0, uint256 feeAmount1);
 
     /// -----------------------------------------------------------------------
     /// Structs and enums
@@ -185,10 +187,9 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm, 
     /// @param newProtocolFeeRecipient The new protocol fee recipient address
     function setHookFeeRecipient(address newProtocolFeeRecipient) external;
 
-    /// @notice Set the hook fee & referral reward params. Only callable by the owner.
+    /// @notice Set the hook fee params. Only callable by the owner.
     /// @param newHookFeeModifier The new hook fee modifier. 6 decimals.
-    /// @param newReferralRewardModifier The new referral reward modifier. 6 decimals.
-    function setModifiers(uint32 newHookFeeModifier, uint32 newReferralRewardModifier) external;
+    function setHookFeeModifier(uint32 newHookFeeModifier) external;
 
     /// @notice Set whether withdrawals are unblocked for the given pool. Only callable by the owner.
     /// @param id The pool id
@@ -200,6 +201,23 @@ interface IBunniHook is IBaseHook, IOwnable, IUnlockCallback, IERC1271, IAmAmm, 
     /// @param newK The new K constant
     /// @param activeBlock The block number at which the new K should take effect
     function scheduleKChange(uint48 newK, uint160 activeBlock) external;
+
+    /// -----------------------------------------------------------------------
+    /// Curator functions
+    /// -----------------------------------------------------------------------
+
+    /// @notice Sets the curator fee rate for the given pool. Only callable by the curator of the pool.
+    /// @dev The curator fee rate is the percentage of swap fees that goes to the curator.
+    /// The curator is the owner of the BunniToken, which is initially set to the pool deployer.
+    /// @param id The pool id
+    /// @param newFeeRate The new curator fee rate. 5 decimals.
+    function curatorSetFeeRate(PoolId id, uint16 newFeeRate) external;
+
+    /// @notice Claims the curator fees for the given pool. Only callable by the curator of the pool.
+    /// @dev The curator is the owner of the BunniToken, which is initially set to the pool deployer.
+    /// @param key The pool key
+    /// @param recipient The recipient of the curator fees
+    function curatorClaimFees(PoolKey calldata key, address recipient) external;
 
     /// -----------------------------------------------------------------------
     /// Rebalance functions

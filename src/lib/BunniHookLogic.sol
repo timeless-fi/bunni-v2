@@ -56,7 +56,6 @@ library BunniHookLogic {
 
     struct Env {
         uint32 hookFeeModifier;
-        uint32 referralRewardModifier;
         IBunniHub hub;
         IPoolManager poolManager;
         IFloodPlain floodPlain;
@@ -387,8 +386,10 @@ library BunniHookLogic {
             ? uint24(FixedPointMathLib.max(amAmmSwapFee, computeSurgeFee(lastSurgeTimestamp, hookParams.surgeFeeHalfLife)))
             : hookFeesBaseSwapFee;
         uint256 hookFeesAmount;
+        uint256 curatorFeeAmount;
         uint256 hookHandleSwapInputAmount;
         uint256 hookHandleSwapOutputAmount;
+        CuratorFees memory curatorFees = s.curatorFees[id];
         if (exactIn) {
             // compute the swap fee and the hook fee (i.e. protocol fee)
             // swap fee is taken by decreasing the output amount
@@ -397,15 +398,17 @@ library BunniHookLogic {
                 // instead of computing hook fees as a portion of the swap fee
                 // and deducting it, we compute hook fees separately using hookFeesBaseSwapFee
                 // and charge it as an extra fee on the swap
-                hookFeesAmount = outputAmount.mulDivUp(hookFeesBaseSwapFee, SWAP_FEE_BASE).mulDivUp(
-                    env.hookFeeModifier, MODIFIER_BASE
-                );
+                uint256 baseSwapFeeAmount = outputAmount.mulDivUp(hookFeesBaseSwapFee, SWAP_FEE_BASE);
+                hookFeesAmount = baseSwapFeeAmount.mulDivUp(env.hookFeeModifier, MODIFIER_BASE);
+                curatorFeeAmount = baseSwapFeeAmount.mulDivUp(curatorFees.feeRate, CURATOR_FEE_BASE);
                 // the case when swapFee = computeSurgeFee(lastSurgeTimestamp, hookParams.surgeFeeHalfLife)
                 if (swapFee != amAmmSwapFee) {
-                    // am-Amm manager's fee is in range [amAmmSwapFee, 100% - hookFeesBaseSwapFee.mulDivUp(env.hookFeeModifier, MODIFIER_BASE)]
+                    // am-Amm manager's fee is in range [amAmmSwapFee, 100% - hookFeesBaseSwapFee.mulDivUp(env.hookFeeModifier, MODIFIER_BASE) - hookFeesBaseSwapFee.mulDivUp(curatorFees.feeRate, CURATOR_FEE_BASE)]
                     uint24 swapFeeAdjusted = uint24(
                         FixedPointMathLib.max(
-                            amAmmSwapFee, swapFee - hookFeesBaseSwapFee.mulDivUp(env.hookFeeModifier, MODIFIER_BASE)
+                            amAmmSwapFee,
+                            swapFee - hookFeesBaseSwapFee.mulDivUp(env.hookFeeModifier, MODIFIER_BASE)
+                                - hookFeesBaseSwapFee.mulDivUp(curatorFees.feeRate, CURATOR_FEE_BASE)
                         )
                     );
                     // recalculate swapFeeAmount
@@ -413,7 +416,8 @@ library BunniHookLogic {
                 }
             } else {
                 hookFeesAmount = swapFeeAmount.mulDivUp(env.hookFeeModifier, MODIFIER_BASE);
-                swapFeeAmount -= hookFeesAmount;
+                curatorFeeAmount = swapFeeAmount.mulDivUp(curatorFees.feeRate, CURATOR_FEE_BASE);
+                swapFeeAmount -= hookFeesAmount + curatorFeeAmount;
             }
 
             // set the am-AMM fee to be the swap fee amount
@@ -423,7 +427,7 @@ library BunniHookLogic {
             (amAmmFeeCurrency, amAmmFeeAmount) = (outputToken, swapFeeAmount);
 
             // modify output amount with fees
-            outputAmount -= swapFeeAmount + hookFeesAmount;
+            outputAmount -= swapFeeAmount + hookFeesAmount + curatorFeeAmount;
 
             // return beforeSwapDelta
             // take in max(amountSpecified, inputAmount) such that if amountSpecified is greater we just happily accept it
@@ -436,7 +440,10 @@ library BunniHookLogic {
 
             // if am-AMM is used, the swap fee needs to be taken from BunniHub, else it stays in BunniHub with the LPs
             (hookHandleSwapInputAmount, hookHandleSwapOutputAmount) = (
-                inputAmount, useAmAmmFee ? outputAmount + swapFeeAmount + hookFeesAmount : outputAmount + hookFeesAmount
+                inputAmount,
+                useAmAmmFee
+                    ? outputAmount + swapFeeAmount + hookFeesAmount + curatorFeeAmount
+                    : outputAmount + hookFeesAmount + curatorFeeAmount
             );
         } else {
             // compute the swap fee and the hook fee (i.e. protocol fee)
@@ -448,12 +455,14 @@ library BunniHookLogic {
                 // instead of computing hook fees as a portion of the swap fee
                 // and deducting it, we compute hook fees separately using hookFeesBaseSwapFee
                 // and charge it as an extra fee on the swap
-                hookFeesAmount = inputAmount.mulDivUp(hookFeesBaseSwapFee, SWAP_FEE_BASE - hookFeesBaseSwapFee).mulDivUp(
-                    env.hookFeeModifier, MODIFIER_BASE
-                );
+                uint256 baseSwapFeeAmount =
+                    inputAmount.mulDivUp(hookFeesBaseSwapFee, SWAP_FEE_BASE - hookFeesBaseSwapFee);
+                hookFeesAmount = baseSwapFeeAmount.mulDivUp(env.hookFeeModifier, MODIFIER_BASE);
+                curatorFeeAmount = baseSwapFeeAmount.mulDivUp(curatorFees.feeRate, CURATOR_FEE_BASE);
             } else {
                 hookFeesAmount = swapFeeAmount.mulDivUp(env.hookFeeModifier, MODIFIER_BASE);
-                swapFeeAmount -= hookFeesAmount;
+                curatorFeeAmount = swapFeeAmount.mulDivUp(curatorFees.feeRate, CURATOR_FEE_BASE);
+                swapFeeAmount -= hookFeesAmount + curatorFeeAmount;
             }
 
             // set the am-AMM fee to be the swap fee amount
@@ -463,7 +472,7 @@ library BunniHookLogic {
             (amAmmFeeCurrency, amAmmFeeAmount) = (inputToken, swapFeeAmount);
 
             // modify input amount with fees
-            inputAmount += swapFeeAmount + hookFeesAmount;
+            inputAmount += swapFeeAmount + hookFeesAmount + curatorFeeAmount;
 
             // return beforeSwapDelta
             // give out min(amountSpecified, outputAmount) such that we only give out as much as requested
@@ -476,8 +485,30 @@ library BunniHookLogic {
 
             // if am-AMM is not used, the swap fee needs to be sent to BunniHub to the LPs, else it stays in BunniHook with the am-AMM manager
             (hookHandleSwapInputAmount, hookHandleSwapOutputAmount) = (
-                useAmAmmFee ? inputAmount - swapFeeAmount - hookFeesAmount : inputAmount - hookFeesAmount, outputAmount
+                useAmAmmFee
+                    ? inputAmount - swapFeeAmount - hookFeesAmount - curatorFeeAmount
+                    : inputAmount - hookFeesAmount - curatorFeeAmount,
+                outputAmount
             );
+        }
+
+        // record curator fees in storage
+        if (curatorFeeAmount != 0) {
+            // if the new accrued fee amount overflows uint120, we simply cap it at type(uint120).max
+            // the overflowed amount would automatically be accounted as hook fees
+            // this is unlikely to happen in production since assuming the token is 18 decimals
+            // the accrued fee will have to be >~1.329 billion billion tokens for it to overflow
+            if (exactIn != params.zeroForOne) {
+                uint256 newAccruedFee0 =
+                    FixedPointMathLib.min(curatorFees.accruedFee0 + curatorFeeAmount, type(uint120).max);
+                s.curatorFees[id].accruedFee0 = uint120(newAccruedFee0);
+                s.totalCuratorFees[key.currency0] += newAccruedFee0 - curatorFees.accruedFee0;
+            } else {
+                uint256 newAccruedFee1 =
+                    FixedPointMathLib.min(curatorFees.accruedFee1 + curatorFeeAmount, type(uint120).max);
+                s.curatorFees[id].accruedFee1 = uint120(newAccruedFee1);
+                s.totalCuratorFees[key.currency1] += newAccruedFee1 - curatorFees.accruedFee1;
+            }
         }
 
         // take input by minting claim tokens to hook
@@ -493,18 +524,6 @@ library BunniHookLogic {
 
         // burn output claim tokens
         env.poolManager.burn(address(this), outputToken.toId(), outputAmount);
-
-        // distribute part of hookFees to referrers
-        if (hookFeesAmount != 0) {
-            uint256 referrerRewardAmount = hookFeesAmount.mulDiv(env.referralRewardModifier, MODIFIER_BASE);
-            if (referrerRewardAmount != 0) {
-                if (!env.poolManager.isOperator(address(this), address(bunniState.bunniToken))) {
-                    env.poolManager.setOperator(address(bunniState.bunniToken), true);
-                }
-                bool isToken0 = exactIn != params.zeroForOne;
-                bunniState.bunniToken.distributeReferralRewards(isToken0, referrerRewardAmount);
-            }
-        }
 
         // emit swap event
         emit IBunniHook.Swap(

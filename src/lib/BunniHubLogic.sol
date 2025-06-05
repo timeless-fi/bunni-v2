@@ -197,14 +197,7 @@ library BunniHubLogic {
 
         // mint shares using actual token amounts
         shares = _mintShares(
-            msgSender,
-            state.bunniToken,
-            params.recipient,
-            amount0,
-            depositReturnData.balance0,
-            amount1,
-            depositReturnData.balance1,
-            params.referrer
+            state.bunniToken, params.recipient, amount0, depositReturnData.balance0, amount1, depositReturnData.balance1
         );
 
         if (depositReturnData.balance0 == 0 && depositReturnData.balance1 == 0) {
@@ -709,24 +702,20 @@ library BunniHubLogic {
     /// -----------------------------------------------------------------------
 
     /// @notice Mints share tokens to the recipient based on the amount of liquidity added.
-    /// @param msgSender The msg.sender of the transaction
     /// @param shareToken The BunniToken to mint
     /// @param recipient The recipient of the share tokens
     /// @param addedAmount0 The amount of token0 added to the pool
     /// @param existingAmount0 The existing amount of token0 in the pool
     /// @param addedAmount1 The amount of token1 added to the pool
     /// @param existingAmount1 The existing amount of token1 in the pool
-    /// @param referrer The referrer of the liquidity provider
     /// @return shares The amount of share tokens minted to the sender.
     function _mintShares(
-        address msgSender,
         IBunniToken shareToken,
         address recipient,
         uint256 addedAmount0,
         uint256 existingAmount0,
         uint256 addedAmount1,
-        uint256 existingAmount1,
-        address referrer
+        uint256 existingAmount1
     ) internal returns (uint256 shares) {
         uint256 existingShareSupply = shareToken.totalSupply();
         if (existingShareSupply == 0) {
@@ -738,7 +727,7 @@ library BunniHubLogic {
             shares = WAD - MIN_INITIAL_SHARES;
             // prevent first staker from stealing funds of subsequent stakers
             // see https://code4rena.com/reports/2022-01-sherlock/#h-01-first-user-can-steal-everyone-elses-tokens
-            shareToken.mint(address(0), MIN_INITIAL_SHARES, address(0));
+            shareToken.mint(address(0), MIN_INITIAL_SHARES);
         } else {
             // given that the position may become single-sided, we need to handle the case where one of the existingAmount values is zero
             if (existingAmount0 == 0 && existingAmount1 == 0) revert BunniHub__ZeroSharesMinted();
@@ -749,14 +738,8 @@ library BunniHubLogic {
             if (shares == 0) revert BunniHub__ZeroSharesMinted();
         }
 
-        // mint shares to sender
-        // only use `referrer` if `msgSender == recipient` to avoid letting anyone
-        // set the referrer of any other address
-        if (msgSender == recipient) {
-            shareToken.mint(recipient, shares, referrer);
-        } else {
-            shareToken.mint(recipient, shares);
-        }
+        // mint shares to recipient
+        shareToken.mint(recipient, shares);
     }
 
     /// @dev Deposits tokens into a vault.

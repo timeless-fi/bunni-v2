@@ -84,7 +84,6 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
     uint8 internal constant DECIMALS = 18;
     int24 internal constant TICK_SPACING = 10;
     uint32 internal constant HOOK_FEE_MODIFIER = 0.1e6;
-    uint32 internal constant REFERRAL_REWARD_MODIFIER = 0.2e6;
     uint48 internal constant K = 7200;
     uint32 internal constant ALPHA = 0.7e8;
     uint256 internal constant MAX_ERROR = 1e9;
@@ -192,7 +191,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
 
         // initialize bunni hub
         IBunniHook[] memory hookWhitelist = new IBunniHook[](0);
-        hub = new BunniHub(poolManager, weth, PERMIT2, new BunniToken(), address(this), address(this), hookWhitelist);
+        hub = new BunniHub(poolManager, weth, PERMIT2, new BunniToken(), address(this), hookWhitelist);
 
         // deploy zone
         zone = new BunniZone(address(this), new address[](0));
@@ -286,8 +285,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
             recipient: depositor,
             refundRecipient: depositor,
             vaultFee0: 0,
-            vaultFee1: 0,
-            referrer: address(0)
+            vaultFee1: 0
         });
         IBunniHub hub_ = hub;
         vm.startPrank(depositor);
@@ -326,8 +324,7 @@ abstract contract BaseTest is Test, Permit2Deployer, FloodDeployer {
             recipient: depositor,
             refundRecipient: depositor,
             vaultFee0: vaultFee0,
-            vaultFee1: vaultFee1,
-            referrer: address(0)
+            vaultFee1: vaultFee1
         });
         IBunniHub hub_ = hub;
         vm.startPrank(depositor);

@@ -9,7 +9,8 @@ import {IBunniHook} from "../interfaces/IBunniHook.sol";
 /// @dev Use `forge inspect [ContractName] storageLayout` to get the slot values
 library BunniStateLibrary {
     bytes32 public constant VAULT_SHARE_PRICES_SLOT = bytes32(uint256(11));
-    bytes32 public constant HOOK_FEE_SLOT = bytes32(uint256(14));
+    bytes32 public constant CURATOR_FEES_SLOT = bytes32(uint256(15));
+    bytes32 public constant HOOK_FEE_SLOT = bytes32(uint256(16));
 
     bytes32 public constant UINT120_MASK = 0x0000000000000000000000000000000000ffffffffffffffffffffffffffffff;
     bytes32 public constant ADDRESS_MASK = 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
@@ -44,14 +45,27 @@ library BunniStateLibrary {
         }
     }
 
-    function getReferralRewardModifier(IBunniHook hook) internal view returns (uint32 referralRewardModifier) {
-        bytes32 data = hook.extsload(HOOK_FEE_SLOT);
+    function getCuratorFees(IBunniHook hook, PoolId poolId)
+        internal
+        view
+        returns (uint16 feeRate, uint120 accruedFee0, uint120 accruedFee1)
+    {
+        bytes32 data = hook.extsload(_getCuratorFeesSlot(poolId));
         assembly ("memory-safe") {
-            referralRewardModifier := and(0xffffffff, shr(192, data))
+            // bottom 16 bits of data
+            feeRate := and(0xffff, data)
+            // next 120 bits of data
+            accruedFee0 := and(UINT120_MASK, shr(16, data))
+            // next 120 bits of data
+            accruedFee1 := and(UINT120_MASK, shr(136, data))
         }
     }
 
     function _getVaultSharePricesSlot(PoolId poolId) internal pure returns (bytes32) {
         return keccak256(abi.encode(PoolId.unwrap(poolId), VAULT_SHARE_PRICES_SLOT));
+    }
+
+    function _getCuratorFeesSlot(PoolId poolId) internal pure returns (bytes32) {
+        return keccak256(abi.encode(PoolId.unwrap(poolId), CURATOR_FEES_SLOT));
     }
 }
